@@ -1,24 +1,46 @@
 {
   "expo": {
-    "name": "hamro-safety",
+    "name": "Hamro Safety",
     "slug": "hamro-safety",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "hamrosafety",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zuptrix.hamrosafety",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Hamro Safety uses your location during active emergencies and safety timer sessions to share your coordinates with trusted emergency contacts.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Hamro Safety uses background location only when you have activated SOS or a Safety Timer to ensure your safety circle can locate you in an emergency."
+      }
     },
     "android": {
+      "package": "com.zuptrix.hamrosafety",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1E3A8A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Hamro Safety to use your location during active emergencies."
+        }
+      ]
+    ]
   }
 }
