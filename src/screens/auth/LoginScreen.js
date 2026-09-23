@@ -1,7 +1,7 @@
 // Hamro Safety - Login Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import Input from '../../components/common/Input';
@@ -37,9 +37,10 @@ export const LoginScreen = ({ navigation }) => {
     <ScreenContainer scrollable contentContainerStyle={styles.container}>
       {/* Brand Header */}
       <View style={styles.brandContainer}>
-        <View style={styles.logoBadge}>
-          <Ionicons name="shield-checkmark" size={48} color={colors.primary} />
-        </View>
+        <Image
+          source={require('../../../assets/brand-logo.png')}
+          style={styles.brandLogoHeader}
+        />
         <Text style={styles.appName}>{APP_CONFIG.appName}</Text>
         <Text style={styles.tagline}>{APP_CONFIG.tagline}</Text>
         <Text style={styles.companyName}>{APP_CONFIG.company}</Text>
@@ -131,18 +132,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  logoBadge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  brandLogoHeader: {
+    width: 96,
+    height: 96,
+    resizeMode: 'contain',
     marginBottom: 12,
   },
   appName: {

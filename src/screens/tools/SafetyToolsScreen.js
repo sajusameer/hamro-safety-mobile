@@ -1,7 +1,7 @@
 // Hamro Safety - Safety Tools Hub Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import colors from '../../theme/colors';
@@ -9,11 +9,27 @@ import colors from '../../theme/colors';
 export const SafetyToolsScreen = ({ navigation }) => {
   return (
     <ScreenContainer scrollable contentContainerStyle={styles.container}>
-      {navigation.canGoBack() && (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-      )}
+      {/* Global Standard Header */}
+      <View style={styles.topHeaderRow}>
+        <Text style={styles.appTitleHeader}>Hamro Safety</Text>
+
+        <View style={styles.headerRightGroup}>
+          <TouchableOpacity
+            style={styles.bellIconBtn}
+            onPress={() => navigation.navigate('HistoryTab')}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            <View style={styles.bellUnreadDot} />
+          </TouchableOpacity>
+
+          <Image
+            source={require('../../../assets/brand-logo.png')}
+            style={styles.headerBrandLogo}
+          />
+        </View>
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.title}>Safety Tools</Text>
         <Text style={styles.subtitle}>
@@ -87,16 +103,45 @@ const styles = StyleSheet.create({
   container: {
     paddingVertical: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  appTitleHeader: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0A2540',
+    letterSpacing: -0.5,
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bellIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
+    position: 'relative',
+  },
+  bellUnreadDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.emergency,
+  },
+  headerBrandLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   header: {
     marginBottom: 16,

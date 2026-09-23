@@ -10,6 +10,7 @@ const SafetyTimerContext = createContext({
   remainingSeconds: 0,
   isExpired: false,
   startTimer: async () => {},
+  extendTimer: async () => {},
   checkInSafe: async () => {},
   needHelp: async () => {},
   cancelTimer: async () => {},
@@ -53,6 +54,14 @@ export const SafetyTimerProvider = ({ children }) => {
     return timer;
   };
 
+  const extendTimer = async (additionalMinutes = 15) => {
+    if (activeTimer) {
+      const updated = await safetyTimerService.extendTimer(activeTimer.id, additionalMinutes);
+      setActiveTimer({ ...updated });
+      setIsExpired(false);
+    }
+  };
+
   const checkInSafe = async (note) => {
     if (activeTimer) {
       await safetyTimerService.checkInSafe(activeTimer.id, note);
@@ -88,6 +97,7 @@ export const SafetyTimerProvider = ({ children }) => {
         remainingSeconds,
         isExpired,
         startTimer,
+        extendTimer,
         checkInSafe,
         needHelp,
         cancelTimer,
@@ -97,6 +107,7 @@ export const SafetyTimerProvider = ({ children }) => {
     </SafetyTimerContext.Provider>
   );
 };
+
 
 export const useSafetyTimer = () => useContext(SafetyTimerContext);
 export default SafetyTimerContext;

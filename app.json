@@ -4,7 +4,7 @@
     "slug": "hamro-safety",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/brand-logo.png",
     "userInterfaceStyle": "light",
     "scheme": "hamrosafety",
     "ios": {
@@ -18,8 +18,8 @@
     "android": {
       "package": "com.zuptrix.hamrosafety",
       "adaptiveIcon": {
-        "backgroundColor": "#1E3A8A",
-        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#0A2540",
+        "foregroundImage": "./assets/brand-logo.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },

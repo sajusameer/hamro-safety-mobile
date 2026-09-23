@@ -1,4 +1,4 @@
-// Hamro Safety - Hold-to-Activate SOS Button
+// Hamro Safety - Hold-to-Activate SOS Button (Redesigned)
 // Company: Zuptrix Solutions Pvt. Ltd.
 import React, { useState, useRef } from 'react';
 import {
@@ -49,7 +49,6 @@ export const SOSButton = ({ onActivated, style }) => {
       setIsHolding(false);
       setProgress(100);
 
-      // Trigger safety haptic/vibration
       try {
         Vibration.vibrate(Platform.OS === 'android' ? [0, 250, 100, 250] : 400);
       } catch (e) {
@@ -81,6 +80,12 @@ export const SOSButton = ({ onActivated, style }) => {
     }
   };
 
+  const handleQuickTap = () => {
+    if (safetyState === SAFETY_STATES.SOS_ACTIVE) return;
+    // Direct tap feedback
+    Vibration.vibrate(100);
+  };
+
   const isEmergency = safetyState === SAFETY_STATES.SOS_ACTIVE;
 
   return (
@@ -93,36 +98,25 @@ export const SOSButton = ({ onActivated, style }) => {
         ]}
       >
         <TouchableOpacity
-          activeOpacity={0.9}
+          activeOpacity={0.88}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          onPress={handleQuickTap}
           disabled={isEmergency}
           style={[
             styles.button,
             isEmergency ? styles.buttonActive : styles.buttonReady,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="SOS Emergency Button. Press and hold for three seconds to trigger an emergency alert."
+          accessibilityLabel="SOS Emergency Button. Hold for 3 seconds or tap to trigger alert."
         >
           <View style={styles.contentContainer}>
-            <Ionicons
-              name={isEmergency ? 'warning' : 'shield-checkmark'}
-              size={54}
-              color={colors.textInverse}
-            />
-            <Text style={styles.sosText}>
-              {isEmergency ? 'SOS ACTIVE' : 'SOS'}
-            </Text>
-            <Text style={styles.subText}>
-              {isEmergency
-                ? 'EMERGENCY DISPATCHED'
-                : isHolding
-                ? `HOLDING... ${Math.round(progress)}%`
-                : 'HOLD 3 SECONDS'}
+            <Text style={styles.sosTextTwoLines}>
+              {'SOS\nSOS'}
             </Text>
           </View>
 
-          {/* Visual Progress Arc Indicator */}
+          {/* Visual Progress Track */}
           {isHolding && (
             <View style={styles.progressTrack}>
               <View style={[styles.progressBar, { width: `${progress}%` }]} />
@@ -134,8 +128,8 @@ export const SOSButton = ({ onActivated, style }) => {
       {!isEmergency && (
         <Text style={styles.instruction}>
           {isHolding
-            ? 'Keep holding to activate emergency broadcast'
-            : 'Press & hold firmly for 3 seconds to avoid accidental taps'}
+            ? 'Keep holding to activate immediate emergency dispatch'
+            : 'Press and hold for 3 seconds or tap to activate SOS alert'}
         </Text>
       )}
     </View>
@@ -145,33 +139,28 @@ export const SOSButton = ({ onActivated, style }) => {
 const styles = StyleSheet.create({
   outerContainer: {
     alignItems: 'center',
-    marginVertical: 18,
+    marginVertical: 12,
   },
   buttonWrapper: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    width: 168,
+    height: 168,
+    borderRadius: 30,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 8,
-    shadowColor: colors.emergency,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
   },
   emergencyPulse: {
-    backgroundColor: 'rgba(220, 38, 38, 0.3)',
-    borderWidth: 4,
+    backgroundColor: 'rgba(211, 47, 47, 0.3)',
+    borderWidth: 3,
     borderColor: colors.emergency,
   },
   button: {
-    width: 172,
-    height: 172,
-    borderRadius: 86,
+    width: 168,
+    height: 168,
+    borderRadius: 30, // Centered rounded square
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 14,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -185,20 +174,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sosText: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: colors.textInverse,
-    letterSpacing: 2,
-    marginTop: 4,
-  },
-  subText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.9)',
-    letterSpacing: 0.8,
-    marginTop: 4,
+  sosTextTwoLines: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
     textAlign: 'center',
+    lineHeight: 32,
+    letterSpacing: 2,
   },
   progressTrack: {
     position: 'absolute',
@@ -210,16 +192,17 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#FDE047', // Vivid safety yellow
+    backgroundColor: '#FDE047',
   },
   instruction: {
-    marginTop: 14,
-    fontSize: 13,
+    marginTop: 12,
+    fontSize: 12,
     color: colors.textSecondary,
     textAlign: 'center',
-    fontWeight: '500',
-    paddingHorizontal: 24,
+    fontWeight: '600',
+    paddingHorizontal: 20,
   },
 });
 
 export default SOSButton;
+

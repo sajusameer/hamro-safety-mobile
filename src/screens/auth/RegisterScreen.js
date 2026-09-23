@@ -1,7 +1,7 @@
 // Hamro Safety - Register Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import Input from '../../components/common/Input';
@@ -56,6 +56,12 @@ export const RegisterScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <View style={styles.formCard}>
+        <View style={styles.brandLogoWrap}>
+          <Image
+            source={require('../../../assets/brand-logo.png')}
+            style={styles.brandLogoHeader}
+          />
+        </View>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Join Hamro Safety for trusted personal protection</Text>
 
@@ -150,6 +156,15 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
+  },
+  brandLogoWrap: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  brandLogoHeader: {
+    width: 96,
+    height: 96,
+    resizeMode: 'contain',
   },
   title: {
     fontSize: 22,

@@ -92,6 +92,37 @@ export const safetyTimerService = {
     return true;
   },
 
+  // Extend active timer by additional minutes
+  extendTimer: async (timerId, additionalMinutes = 15) => {
+    if (activeTimerState && activeTimerState.id === timerId) {
+      const currentExpiry = new Date(activeTimerState.expires_at).getTime();
+      const newExpiry = new Date(currentExpiry + additionalMinutes * 60 * 1000);
+      activeTimerState = {
+        ...activeTimerState,
+        expires_at: newExpiry.toISOString(),
+        duration_minutes: (activeTimerState.duration_minutes || 0) + additionalMinutes,
+      };
+    }
+
+    if (isSupabaseConfigured && activeTimerState) {
+      await supabase
+        .from('safety_timers')
+        .update({
+          expires_at: activeTimerState.expires_at,
+          duration_minutes: activeTimerState.duration_minutes,
+        })
+        .eq('id', timerId);
+    }
+
+    await mockPushNotificationService.sendAlert(
+      'Safety Timer Extended',
+      `Timer extended by ${additionalMinutes} minutes for trip to ${activeTimerState?.destination || 'Destination'}.`,
+      { timerId }
+    );
+
+    return activeTimerState;
+  },
+
   // Cancel timer
   cancelTimer: async (timerId) => {
     if (activeTimerState && activeTimerState.id === timerId) {

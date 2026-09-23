@@ -1,13 +1,12 @@
-// Hamro Safety - Emergency History Screen
+// Hamro Safety - Emergency History Screen (Global Standard)
 // Company: Zuptrix Solutions Pvt. Ltd.
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import ErrorState from '../../components/common/ErrorState';
-import Button from '../../components/common/Button';
 import colors from '../../theme/colors';
 import historyService from '../../services/history/historyService';
 import { useAuth } from '../../context/AuthContext';
@@ -58,36 +57,53 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
     switch (status) {
       case 'resolved':
       case 'completed_safe':
-        return { label: 'RESOLVED SAFE', color: colors.safe, bg: colors.safeLight, icon: 'checkmark-circle' };
+        return { label: '✓ RESOLVED SAFE', color: colors.safeDark, bg: colors.safeLight, icon: 'checkmark-circle-sharp' };
       case 'cancelled':
-        return { label: 'CANCELLED', color: colors.textSecondary, bg: colors.surfaceSubtle, icon: 'close-circle' };
+        return { label: 'CANCELLED', color: colors.textSecondary, bg: colors.surfaceContainer, icon: 'close-circle-sharp' };
       case 'active':
-        return { label: 'ACTIVE', color: colors.emergency, bg: colors.emergencyLight, icon: 'warning' };
+        return { label: 'ACTIVE SOS', color: '#FFF', bg: colors.emergency, icon: 'warning-sharp' };
       default:
-        return { label: status?.toUpperCase(), color: colors.warningDark, bg: colors.warningLight, icon: 'alert-circle' };
+        return { label: status?.toUpperCase() || 'RESOLVED', color: colors.safeDark, bg: colors.safeLight, icon: 'checkmark-circle-sharp' };
     }
   };
 
   return (
     <ScreenContainer contentContainerStyle={styles.container}>
-      <View style={styles.headerRow}>
-        <View>
+      {/* 1. Global Header Standard */}
+      <View style={styles.topHeaderRow}>
+        <Text style={styles.appTitleHeader}>Hamro Safety</Text>
+
+        <View style={styles.headerRightGroup}>
+          <TouchableOpacity
+            style={styles.bellIconBtn}
+            onPress={() => fetchHistory()}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            <View style={styles.bellUnreadDot} />
+          </TouchableOpacity>
+
+          <Image
+            source={require('../../../assets/brand-logo.png')}
+            style={styles.headerBrandLogo}
+          />
+        </View>
+      </View>
+
+      <View style={styles.pageHeaderRow}>
+        <View style={styles.pageHeaderCol}>
           <Text style={styles.title}>Safety History</Text>
           <Text style={styles.subtitle}>Audit trail of emergency alerts and check-ins</Text>
         </View>
         {history.length > 0 && (
-          <Button
-            title="Clear"
-            variant="outline"
-            size="sm"
-            onPress={handleClearHistory}
-            style={styles.clearBtn}
-          />
+          <TouchableOpacity style={styles.clearHeaderBtn} onPress={handleClearHistory}>
+            <Text style={styles.clearHeaderBtnText}>Clear</Text>
+          </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.privacyNote}>
-        <Ionicons name="lock-closed" size={14} color={colors.secondary} />
+        <Ionicons name="shield-checkmark-sharp" size={14} color={colors.safe} />
         <Text style={styles.privacyNoteText}>
           Privacy Guard: Detailed GPS breadcrumbs are discarded once emergencies are resolved.
         </Text>
@@ -113,7 +129,7 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
               <View style={styles.eventCard}>
                 <View style={styles.cardHeader}>
                   <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-                    <Ionicons name={badge.icon} size={14} color={badge.color} />
+                    <Ionicons name={badge.icon} size={13} color={badge.color} />
                     <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
                   </View>
                   <Text style={styles.eventTime}>
@@ -122,23 +138,14 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
                   </Text>
                 </View>
 
-                <Text style={styles.eventType}>
+                {/* Two stacked lines for headline and subtitle */}
+                <Text style={styles.eventHeadline}>
                   {item.event_type === 'sos' ? 'SOS Emergency Alert' : 'Safety Arrival Timer'}
                 </Text>
 
-                {item.location_name && (
-                  <View style={styles.metaRow}>
-                    <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.metaText}>{item.location_name}</Text>
-                  </View>
-                )}
-
-                {item.resolution_note && (
-                  <View style={styles.noteBox}>
-                    <Text style={styles.noteLabel}>Resolution Note:</Text>
-                    <Text style={styles.noteText}>{item.resolution_note}</Text>
-                  </View>
-                )}
+                <Text style={styles.eventSubtitle}>
+                  {item.resolution_note || item.location_name || 'Checked in safely via app'}
+                </Text>
               </View>
             );
           }}
@@ -164,11 +171,54 @@ const styles = StyleSheet.create({
   container: {
     paddingVertical: 12,
   },
-  headerRow: {
+  topHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  appTitleHeader: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0A2540',
+    letterSpacing: -0.5,
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bellIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellUnreadDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.emergency,
+  },
+  headerBrandLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
+  },
+  pageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  pageHeaderCol: {
+    flex: 1,
   },
   title: {
     fontSize: 20,
@@ -176,27 +226,33 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  clearBtn: {
-    minHeight: 32,
+  clearHeaderBtn: {
+    backgroundColor: colors.surfaceContainer,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  clearHeaderBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
   privacyNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDFA',
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: colors.safeLight,
+    padding: 10,
+    borderRadius: 10,
     gap: 6,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   privacyNoteText: {
     fontSize: 11,
-    color: colors.secondary,
+    color: colors.safeDark,
     fontWeight: '600',
     flex: 1,
   },
@@ -222,50 +278,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
     gap: 4,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
   },
   eventTime: {
     fontSize: 11,
     color: colors.textMuted,
   },
-  eventType: {
-    fontSize: 15,
-    fontWeight: '700',
+  eventHeadline: {
+    fontSize: 14,
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 4,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginVertical: 2,
-  },
-  metaText: {
+  eventSubtitle: {
     fontSize: 12,
     color: colors.textSecondary,
-  },
-  noteBox: {
-    backgroundColor: colors.surfaceSubtle,
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
-  },
-  noteLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  noteText: {
-    fontSize: 12,
-    color: colors.textPrimary,
     marginTop: 2,
   },
 });
 
 export default EmergencyHistoryScreen;
+

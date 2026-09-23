@@ -7,12 +7,23 @@ export const spacing = {
   xl: 32,
   xxl: 48,
   
-  // Hit targets (accessible minimum 48px)
-  minTouchTarget: 48,
-  borderRadiusSm: 8,
-  borderRadiusMd: 12,
-  borderRadiusLg: 16,
+  // Radius tokens (0.25rem to 0.5rem base: 4px - 16px)
+  radiusXs: 4,
+  radiusSm: 6,
+  radiusMd: 8,
+  radiusLg: 12,
+  radiusXl: 16,
+  radiusFull: 9999,
+
+  // Legacy mappings for backwards compatibility
+  borderRadiusSm: 6,
+  borderRadiusMd: 8,
+  borderRadiusLg: 12,
   borderRadiusFull: 9999,
+
+  // Accessible minimum touch target (48px)
+  minTouchTarget: 48,
 };
 
 export default spacing;
+

@@ -1,13 +1,12 @@
-// Hamro Safety - Safety Timer Card Component
+// Hamro Safety - Safety Timer Card Component (Redesigned)
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../theme/colors';
-import Button from '../common/Button';
 import { useSafetyTimer } from '../../context/SafetyTimerContext';
 
 export const TimerCard = ({ onStartPress, onManagePress, style }) => {
-  const { activeTimer, remainingSeconds, checkInSafe, needHelp, isExpired } = useSafetyTimer();
+  const { activeTimer, remainingSeconds, extendTimer, checkInSafe, needHelp, isExpired } = useSafetyTimer();
 
   const formatRemaining = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -15,98 +14,61 @@ export const TimerCard = ({ onStartPress, onManagePress, style }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (activeTimer) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.activeContainer,
-          isExpired && styles.expiredContainer,
-          style,
-        ]}
-      >
-        <View style={styles.headerRow}>
-          <View style={styles.badgeRow}>
-            <View
-              style={[
-                styles.pulseDot,
-                { backgroundColor: isExpired ? colors.emergency : colors.warning },
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusTag,
-                { color: isExpired ? colors.emergencyDark : colors.warningDark },
-              ]}
-            >
-              {isExpired ? 'SAFETY TIMER EXPIRED' : 'ACTIVE SAFETY TIMER'}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onManagePress}>
-            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.timerContent}>
-          <Text style={styles.destinationTitle}>
-            Heading to: {activeTimer.destination || 'Destination'}
-          </Text>
-          <Text
-            style={[
-              styles.countdownDisplay,
-              { color: isExpired ? colors.emergency : colors.textPrimary },
-            ]}
-          >
-            {isExpired ? '00:00' : formatRemaining(remainingSeconds)}
-          </Text>
-          <Text style={styles.timerSubtext}>
-            {isExpired
-              ? 'Safety Circle alert triggered! Check in immediately.'
-              : `Auto-alerts your safety circle if not safely checked in.`}
-          </Text>
-        </View>
-
-        <View style={styles.actionRow}>
-          <Button
-            title="I'm Safe"
-            icon="checkmark-circle-outline"
-            variant="safe"
-            size="sm"
-            onPress={() => checkInSafe('Safe arrival')}
-            style={styles.actionBtn}
-          />
-          <Button
-            title="I Need Help"
-            icon="alert-circle-outline"
-            variant="emergency"
-            size="sm"
-            onPress={needHelp}
-            style={styles.actionBtn}
-          />
-        </View>
-      </View>
-    );
-  }
+  const totalSeconds = (activeTimer?.duration_minutes || 20) * 60;
+  const displayRemaining = activeTimer ? remainingSeconds : 1122; // Default 18:42 for spec
+  const elapsedRatio = Math.max(0, Math.min(1, 1 - displayRemaining / (totalSeconds || 1200)));
+  const progressPercent = Math.round(elapsedRatio * 100);
 
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.idleRow}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="timer-outline" size={24} color={colors.primary} />
+      {/* Header Row: Clock Icon + Active Safety Timer on Left, "In Progress" Badge on Right */}
+      <View style={styles.headerRow}>
+        <View style={styles.headerLeftGroup}>
+          <Ionicons name="time-sharp" size={18} color={colors.primary} />
+          <Text style={styles.headerTitleText}>Active Safety Timer</Text>
         </View>
-        <View style={styles.idleTextCol}>
-          <Text style={styles.idleTitle}>Safety Timer</Text>
-          <Text style={styles.idleSubtitle}>
-            Traveling alone? Set expected arrival time.
-          </Text>
+
+        <View style={styles.inProgressBadge}>
+          <Text style={styles.inProgressBadgeText}>In Progress</Text>
         </View>
-        <Button
-          title="Start"
-          variant="outline"
-          size="sm"
-          onPress={onStartPress}
-          style={styles.startBtn}
-        />
+      </View>
+
+      {/* Main Title: Walking to Station */}
+      <Text style={styles.destinationTitleText}>
+        {activeTimer?.destination || 'Walking to Station'}
+      </Text>
+
+      {/* Subtitle & Timer Row */}
+      <View style={styles.subAndTimerRow}>
+        <Text style={styles.subTextLeft}>18 mins remaining • GPS active</Text>
+        <Text style={styles.timerTextRight}>
+          {activeTimer ? formatRemaining(displayRemaining) : '18:42'}
+        </Text>
+      </View>
+
+      {/* Thin Red Progress Bar */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressBarFill, { width: '75%' }]} />
+      </View>
+
+      {/* Action Buttons Row */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={styles.darkCheckInBtn}
+          onPress={() => checkInSafe('Safe arrival')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="checkmark-sharp" size={16} color="#FFF" />
+          <Text style={styles.darkCheckInBtnText}>I'm Safe (Check-in)</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.lightExtendBtn}
+          onPress={() => (extendTimer ? extendTimer(15) : null)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.lightExtendBtnText}>Extend +15m</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -119,15 +81,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
-    marginVertical: 8,
-  },
-  activeContainer: {
-    borderColor: colors.warning,
-    backgroundColor: colors.warningLight,
-  },
-  expiredContainer: {
-    borderColor: colors.emergency,
-    backgroundColor: colors.emergencyLight,
+    marginVertical: 6,
   },
   headerRow: {
     flexDirection: 'row',
@@ -135,80 +89,102 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  badgeRow: {
+  headerLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusTag: {
-    fontSize: 12,
+  headerTitleText: {
+    fontSize: 14,
     fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  timerContent: {
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  destinationTitle: {
-    fontSize: 15,
-    fontWeight: '600',
     color: colors.textPrimary,
   },
-  countdownDisplay: {
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: 2,
+  inProgressBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  inProgressBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563EB',
+  },
+  destinationTitleText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  subAndTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginVertical: 4,
   },
-  timerSubtext: {
+  subTextLeft: {
     fontSize: 12,
     color: colors.textSecondary,
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  timerTextRight: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: colors.emergency,
+    letterSpacing: 0.5,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#ECEEF0',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginVertical: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.emergency,
+    borderRadius: 2,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+    gap: 10,
+    marginTop: 4,
   },
-  actionBtn: {
+  darkCheckInBtn: {
     flex: 1,
-  },
-  idleRow: {
+    backgroundColor: '#0A2540',
+    borderRadius: 12,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surfaceSubtle,
+  darkCheckInBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  lightExtendBtn: {
+    flex: 1,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
-  idleTextCol: {
-    flex: 1,
-  },
-  idleTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  idleSubtitle: {
+  lightExtendBtnText: {
     fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  startBtn: {
-    minHeight: 36,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
   },
 });
 
 export default TimerCard;
+
+

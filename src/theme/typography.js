@@ -2,8 +2,8 @@
 import { Platform } from 'react-native';
 
 const fontFamily = Platform.select({
-  ios: 'System',
-  android: 'Roboto',
+  ios: 'Inter',
+  android: 'Inter',
   default: 'System',
 });
 
@@ -33,3 +33,4 @@ export const typography = {
 };
 
 export default typography;
+

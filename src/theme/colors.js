@@ -2,46 +2,49 @@
 // Zuptrix Solutions Pvt. Ltd.
 
 export const colors = {
-  // Brand
-  primary: '#1E3A8A', // Deep Trust Navy
-  primaryLight: '#3B82F6',
-  primaryDark: '#172554',
-  secondary: '#0F766E', // Calm Teal
-  
-  // Safety States (Never communicate states by color alone)
-  safe: '#10B981',      // Emerald Green - Calm & Secure
-  safeLight: '#D1FAE5',
-  safeDark: '#065F46',
+  // Brand & Primary
+  primary: '#0A2540',           // Deep Navy
+  primaryLight: '#1A365D',      // Slate Navy Light
+  primaryDark: '#04101D',       // Midnight Navy
+  secondary: '#D32F2F',         // Secondary Alert Red
 
-  warning: '#F59E0B',   // Amber Orange - Caution / Timer Alert
-  warningLight: '#FEF3C7',
-  warningDark: '#92400E',
+  // Safety & Emergency States
+  emergency: '#D32F2F',         // Alert Red
+  emergencyDark: '#b6171e',     // Dark Alert Red
+  emergencyLight: '#FDE8E8',
+  emergencyGlow: 'rgba(211, 47, 47, 0.25)',
 
-  emergency: '#DC2626', // Crimson Red - Urgent Action
-  emergencyLight: '#FEE2E2',
-  emergencyDark: '#991B1B',
+  safe: '#0F9D58',              // Secure Green
+  safeLight: '#E6F4EA',
+  safeDark: '#137333',
+  safeGlow: 'rgba(15, 157, 88, 0.2)',
 
-  resolved: '#059669',  // Steady Green - Resolved & Normalizing
-  resolvedLight: '#D1FAE5',
+  warning: '#F57C00',           // Amber Alert
+  warningLight: '#FFF3E0',
+  warningDark: '#E65100',
 
-  // Neutrals / Surfaces
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  surfaceSubtle: '#F1F5F9',
-  surfaceBorder: '#E2E8F0',
-  surfaceBorderDark: '#CBD5E1',
+  resolved: '#0F9D58',
+  resolvedLight: '#E6F4EA',
 
-  // Typography
-  textPrimary: '#0F172A',
-  textSecondary: '#475569',
-  textMuted: '#94A3B8',
-  textInverse: '#FFFFFF',
+  // Neutrals & Surface Containers (per tokens specification)
+  background: '#f7f9fb',        // Neutral Background
+  surface: '#ffffff',           // Surface Base Container
+  surfaceContainer: '#eceef0',  // Surface Container
+  surfaceContainerHigh: '#e6e8ea', // Surface Container High
+  surfaceSubtle: '#eceef0',
+  surfaceBorder: '#e0e3e6',
+  surfaceBorderDark: '#cbd0d6',
+
+  // Text Colors (per tokens specification)
+  textPrimary: '#191c1e',       // on-surface
+  textSecondary: '#43474d',     // on-surface-variant
+  textMuted: '#73777f',
+  textInverse: '#ffffff',
 
   // Overlays & Accents
-  overlay: 'rgba(15, 23, 42, 0.65)',
-  emergencyGlow: 'rgba(220, 38, 38, 0.25)',
-  safeGlow: 'rgba(16, 185, 129, 0.2)',
-  divider: '#E2E8F0',
+  overlay: 'rgba(25, 28, 30, 0.65)',
+  divider: '#e0e3e6',
 };
 
 export default colors;
+
