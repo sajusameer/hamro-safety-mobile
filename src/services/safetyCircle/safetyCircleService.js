@@ -1,44 +1,55 @@
 // Hamro Safety - Safety Circle Service
 // Company: Zuptrix Solutions Pvt. Ltd.
-import contactsService from '../contacts/contactsService';
+import contactService from '../contactService';
+import { isSupabaseConfigured } from '../supabase';
 
 export const safetyCircleService = {
+  isConfigured: isSupabaseConfigured,
+
   // Get all safety circle members with their permissions
-  getCircleMembers: async (userId = 'demo-user-123') => {
-    const contacts = await contactsService.getContacts(userId);
-    return contacts.map((c) => ({
-      contactId: c.id,
-      name: c.name,
-      phone: c.phone,
-      relationship: c.relationship,
-      priority: c.priority,
-      allowSosAlerts: c.safety_circle?.allow_sos_alerts ?? c.safety_circle?.allowSosAlerts ?? true,
-      allowEmergencyLocation: c.safety_circle?.allow_emergency_location ?? c.safety_circle?.allowEmergencyLocation ?? true,
-      allowSafetyTimerAlerts: c.safety_circle?.allow_safety_timer_alerts ?? c.safety_circle?.allowSafetyTimerAlerts ?? false,
-      allowStatusUpdates: c.safety_circle?.allow_status_updates ?? c.safety_circle?.allowStatusUpdates ?? true,
-      status: c.safety_circle?.status ?? 'active',
-    }));
+  getCircleMembers: async (userId) => {
+    try {
+      const contacts = await contactService.getContacts(userId);
+      const circleContacts = contacts.filter((c) => c.is_in_circle !== false);
+
+      return circleContacts.map((c) => ({
+        id: c.id,
+        contactId: c.id,
+        name: c.name,
+        role: c.relationship || 'Circle Member',
+        phone: c.phone,
+        email: c.email,
+        statusText: c.statusText || 'Active in Safety Circle',
+        avatar: c.avatar_url || c.avatar || null,
+        settingText: 'Live Location Enabled',
+        settingIcon: 'settings-sharp',
+        battery: c.battery || 88,
+        showBattery: true,
+        allowSosAlerts: true,
+        allowEmergencyLocation: true,
+        status: 'active',
+      }));
+    } catch (e) {
+      console.warn('Error fetching safety circle members:', e);
+      return [];
+    }
   },
 
-  // Toggle specific permission with bidirectional key persistence
+  // Add new member to safety circle
+  addMember: async (contactData, userId) => {
+    const contact = await contactService.addContact({ ...contactData, is_in_circle: true }, userId);
+    return contact;
+  },
+
+  // Remove member from safety circle (or turn off is_in_circle)
+  removeMember: async (contactId) => {
+    return await contactService.updateContact(contactId, { is_in_circle: false });
+  },
+
+  // Toggle specific permission
   togglePermission: async (contactId, permissionKey, currentValue) => {
     const nextVal = !currentValue;
-    const map = {
-      allow_sos_alerts: 'allowSosAlerts',
-      allowSosAlerts: 'allow_sos_alerts',
-      allow_emergency_location: 'allowEmergencyLocation',
-      allowEmergencyLocation: 'allow_emergency_location',
-      allow_safety_timer_alerts: 'allowSafetyTimerAlerts',
-      allowSafetyTimerAlerts: 'allow_safety_timer_alerts',
-      allow_status_updates: 'allowStatusUpdates',
-      allowStatusUpdates: 'allow_status_updates',
-    };
-    const otherKey = map[permissionKey];
-    const permissions = {
-      [permissionKey]: nextVal,
-      ...(otherKey ? { [otherKey]: nextVal } : {}),
-    };
-    return await contactsService.updatePermissions(contactId, permissions);
+    return await contactService.updateContact(contactId, { [permissionKey]: nextVal });
   },
 };
 

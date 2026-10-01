@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from '../../theme/colors';
 import { useSafetyTimer } from '../../context/SafetyTimerContext';
 
-export const TimerCard = ({ onStartPress, onManagePress, style }) => {
-  const { activeTimer, remainingSeconds, extendTimer, checkInSafe, needHelp, isExpired } = useSafetyTimer();
+export const TimerCard = ({ onStartPress, style }) => {
+  const { activeTimer, remainingSeconds, extendTimer, checkInSafe } = useSafetyTimer();
 
   const formatRemaining = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -14,9 +14,33 @@ export const TimerCard = ({ onStartPress, onManagePress, style }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const totalSeconds = (activeTimer?.duration_minutes || 20) * 60;
-  const displayRemaining = activeTimer ? remainingSeconds : 1122; // Default 18:42 for spec
-  const elapsedRatio = Math.max(0, Math.min(1, 1 - displayRemaining / (totalSeconds || 1200)));
+  if (!activeTimer) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeftGroup}>
+            <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.headerTitleText}>No Active Safety Timer</Text>
+          </View>
+        </View>
+        <Text style={styles.noActiveSub}>
+          Set a trip monitor when walking home or travelling late.
+        </Text>
+        <TouchableOpacity
+          style={styles.startTimerBtn}
+          onPress={onStartPress}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+          <Text style={styles.startTimerBtnText}>Start Safety Timer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const totalSeconds = (activeTimer.duration_minutes || 20) * 60;
+  const remainingMins = Math.ceil(remainingSeconds / 60);
+  const elapsedRatio = Math.max(0, Math.min(1, 1 - remainingSeconds / (totalSeconds || 1200)));
   const progressPercent = Math.round(elapsedRatio * 100);
 
   return (
@@ -33,22 +57,22 @@ export const TimerCard = ({ onStartPress, onManagePress, style }) => {
         </View>
       </View>
 
-      {/* Main Title: Walking to Station */}
+      {/* Main Title */}
       <Text style={styles.destinationTitleText}>
-        {activeTimer?.destination || 'Walking to Station'}
+        {activeTimer.destination || activeTimer.title || 'Trip Monitoring'}
       </Text>
 
       {/* Subtitle & Timer Row */}
       <View style={styles.subAndTimerRow}>
-        <Text style={styles.subTextLeft}>18 mins remaining • GPS active</Text>
+        <Text style={styles.subTextLeft}>{remainingMins} mins remaining • GPS active</Text>
         <Text style={styles.timerTextRight}>
-          {activeTimer ? formatRemaining(displayRemaining) : '18:42'}
+          {formatRemaining(remainingSeconds)}
         </Text>
       </View>
 
       {/* Thin Red Progress Bar */}
       <View style={styles.progressTrack}>
-        <View style={[styles.progressBarFill, { width: '75%' }]} />
+        <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
       </View>
 
       {/* Action Buttons Row */}
@@ -59,7 +83,7 @@ export const TimerCard = ({ onStartPress, onManagePress, style }) => {
           activeOpacity={0.85}
         >
           <Ionicons name="checkmark-sharp" size={16} color="#FFF" />
-          <Text style={styles.darkCheckInBtnText}>I'm Safe (Check-in)</Text>
+          <Text style={styles.darkCheckInBtnText}>{"I'm Safe (Check-in)"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -98,6 +122,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: colors.textPrimary,
+  },
+  noActiveSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  startTimerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: 12,
+    paddingVertical: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+  startTimerBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
   },
   inProgressBadge: {
     backgroundColor: '#EFF6FF',
@@ -186,5 +231,3 @@ const styles = StyleSheet.create({
 });
 
 export default TimerCard;
-
-

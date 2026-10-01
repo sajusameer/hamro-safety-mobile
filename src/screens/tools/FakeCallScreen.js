@@ -30,13 +30,15 @@ export const FakeCallScreen = ({ navigation }) => {
 
   // Trigger countdown to call
   const startSimulation = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
     setCallState('countdown');
     setCountdown(callDelaySeconds);
 
-    const interval = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(interval);
+          if (timerRef.current) clearInterval(timerRef.current);
+          timerRef.current = null;
           triggerRinging();
           return 0;
         }
@@ -56,9 +58,12 @@ export const FakeCallScreen = ({ navigation }) => {
   };
 
   const answerCall = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
     try {
       Vibration.cancel();
-    } catch {}
+    } catch (e) {
+      console.warn('Vibration cancel error:', e);
+    }
     setCallState('connected');
     setCallDuration(0);
 
@@ -68,10 +73,15 @@ export const FakeCallScreen = ({ navigation }) => {
   };
 
   const endCall = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     try {
       Vibration.cancel();
-    } catch {}
+    } catch (e) {
+      console.warn('Vibration cancel error:', e);
+    }
     setCallState('idle');
     setCallDuration(0);
   };

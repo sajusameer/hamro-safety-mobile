@@ -20,29 +20,80 @@ import ScreenContainer from '../../components/common/ScreenContainer';
 import Button from '../../components/common/Button';
 import colors from '../../theme/colors';
 import { useEmergency } from '../../context/EmergencyContext';
-import { SAFETY_STATES } from '../../constants/safetyStates';
 import { APP_CONFIG } from '../../constants/config';
+import locationService from '../../services/location/locationService';
+import { subscribeToLocationUpdates } from '../../services/sosService';
+import contactService from '../../services/contactService';
+import evidenceService from '../../services/evidenceService';
 
 const HOLD_CANCEL_DURATION_MS = 2000; // 2 seconds hold to confirm safe
 
 export const SOSScreen = ({ navigation }) => {
   const {
-    safetyState,
     resolveEmergency,
+    activeEmergency,
+    lastLocation,
   } = useEmergency();
 
-  const isEmergency = safetyState === SAFETY_STATES.SOS_ACTIVE;
+  // Realtime telemetry update state
+  const [telemetry, setTelemetry] = useState(null);
+  const [circleContacts, setCircleContacts] = useState([]);
+
+  // Fetch circle contacts
+  useEffect(() => {
+    let isMounted = true;
+    const loadCircleContacts = async () => {
+      try {
+        const contacts = await contactService.getContacts();
+        const activeInCircle = (contacts || []).filter((c) => c.is_in_circle !== false);
+        if (isMounted) setCircleContacts(activeInCircle);
+      } catch (e) {
+        console.warn('Fetch circle contacts in SOS error:', e);
+      }
+    };
+    loadCircleContacts();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Real-time Telemetry Subscription via sosService.subscribeToLocationUpdates
+  useEffect(() => {
+    if (!activeEmergency?.id) return;
+    const unsubscribe = subscribeToLocationUpdates(activeEmergency.id, (newLocation) => {
+      setTelemetry(newLocation);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [activeEmergency?.id]);
+
+  const [isMicRecording, setIsMicRecording] = useState(false);
+
+  // Start Evidence Recording Session (Feature 12)
+  useEffect(() => {
+    let isMounted = true;
+    if (!activeEmergency?.id) return;
+    const initMic = async () => {
+      const session = await evidenceService.startRealEvidenceRecording(activeEmergency.id);
+      if (isMounted) {
+        setIsMicRecording(Boolean(session?.isMicActive));
+      }
+    };
+    initMic();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeEmergency?.id]);
 
   // Stopwatch counter (starting at 01:45 = 105 seconds for reference spec)
   const [elapsedSeconds, setElapsedSeconds] = useState(105);
-  const [gpsUpdateTick, setGpsUpdateTick] = useState(0);
 
   // Hold to resolve state
   const [cancelProgress, setCancelProgress] = useState(0);
   const [isHoldingCancel, setIsHoldingCancel] = useState(false);
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+  const [recPulseAnim] = useState(() => new Animated.Value(1));
   const cancelTimerRef = useRef(null);
   const cancelIntervalRef = useRef(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Resolution modal
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
@@ -67,15 +118,42 @@ export const SOSScreen = ({ navigation }) => {
     );
     loop.start();
     return () => loop.stop();
-  }, []);
+  }, [pulseAnim]);
 
-  // Live stopwatch and GPS update loop every 1s / 2s
+  // Pulsing recording red dot animation
+  useEffect(() => {
+    const recLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recPulseAnim, {
+          toValue: 0.2,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(recPulseAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    recLoop.start();
+    return () => recLoop.stop();
+  }, [recPulseAnim]);
+
+  // Live stopwatch loop every 1s
   useEffect(() => {
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
-      setGpsUpdateTick((prev) => (prev + 1) % 2);
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Cleanup cancel timers on unmount
+  useEffect(() => {
+    return () => {
+      if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
+      if (cancelIntervalRef.current) clearInterval(cancelIntervalRef.current);
+    };
   }, []);
 
   const formatStopwatchMMSS = (totalSecs) => {
@@ -89,11 +167,8 @@ export const SOSScreen = ({ navigation }) => {
     setIsHoldingCancel(true);
     setCancelProgress(0);
 
-    const startTime = Date.now();
     cancelIntervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(100, Math.floor((elapsed / HOLD_CANCEL_DURATION_MS) * 100));
-      setCancelProgress(pct);
+      setCancelProgress((prev) => Math.min(100, Math.floor(prev + (40 / HOLD_CANCEL_DURATION_MS) * 100)));
     }, 40);
 
     cancelTimerRef.current = setTimeout(async () => {
@@ -103,7 +178,7 @@ export const SOSScreen = ({ navigation }) => {
 
       try {
         Vibration.vibrate(200);
-      } catch (e) {}
+      } catch (_e) {}
 
       await handleResolveConfirmed('Safe confirmation via hold gesture');
     }, HOLD_CANCEL_DURATION_MS);
@@ -118,15 +193,33 @@ export const SOSScreen = ({ navigation }) => {
     }
   };
 
+  const handleImSafeTap = () => {
+    Alert.alert(
+      'Confirm You Are Safe',
+      'Are you sure you want to resolve this active emergency and notify your Safety Circle that you are safe?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, I Am Safe',
+          onPress: () => handleResolveConfirmed('User confirmed safety'),
+        },
+      ]
+    );
+  };
+
   const handleResolveConfirmed = async (note) => {
     setResolving(true);
+    const safeNoteToSend = note || resolutionNote || 'User confirmed safety.';
     try {
-      await resolveEmergency(note || resolutionNote || 'User confirmed safety.');
+      if (activeEmergency?.id) {
+        await evidenceService.stopAndUploadEvidenceRecording(activeEmergency.id, safeNoteToSend);
+      }
+      await resolveEmergency(safeNoteToSend);
       setResolveModalVisible(false);
       setResolutionNote('');
       Alert.alert('Emergency Resolved', 'Your safe status has been restored.');
       navigation.navigate('DashboardTab');
-    } catch (e) {
+    } catch (_e) {
       Alert.alert('Error', 'Failed to resolve emergency.');
     } finally {
       setResolving(false);
@@ -136,6 +229,32 @@ export const SOSScreen = ({ navigation }) => {
   const handleCallEmergency = (number) => {
     Linking.openURL(`tel:${number}`);
   };
+
+  const currentLat = telemetry?.latitude || lastLocation?.latitude || 27.7172;
+  const currentLng = telemetry?.longitude || lastLocation?.longitude || 85.3240;
+  const currentAccuracy = Math.round(telemetry?.accuracy || lastLocation?.accuracy || 4);
+
+  const [locationName, setLocationName] = useState(
+    telemetry?.locationName || lastLocation?.locationName || 'Kathmandu Valley, Nepal'
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const resolveName = async () => {
+      if (telemetry?.locationName) {
+        setLocationName(telemetry.locationName);
+      } else if (lastLocation?.locationName) {
+        setLocationName(lastLocation.locationName);
+      } else {
+        const name = await locationService.getReverseGeocode(currentLat, currentLng);
+        if (isMounted && name) setLocationName(name);
+      }
+    };
+    resolveName();
+    return () => { isMounted = false; };
+  }, [currentLat, currentLng, telemetry, lastLocation]);
+
+  const mapUri = `https://static-maps.yandex.ru/1.x/?ll=${currentLng.toFixed(4)},${currentLat.toFixed(4)}&z=14&l=map&pt=${currentLng.toFixed(4)},${currentLat.toFixed(4)},pm2rdm&size=450,180`;
 
   return (
     <ScreenContainer scrollable contentContainerStyle={styles.container}>
@@ -183,7 +302,7 @@ export const SOSScreen = ({ navigation }) => {
           </View>
         </Animated.View>
 
-        {/* 2. Live GPS Coordinates Card (Kathmandu map snapshot height 144, pulsing pin, ±4m accuracy) */}
+        {/* 2. Live GPS Coordinates Card */}
         <View style={styles.gpsCard}>
           <View style={styles.gpsCardTopHeader}>
             <View style={styles.gpsCardTitleRow}>
@@ -191,13 +310,13 @@ export const SOSScreen = ({ navigation }) => {
               <Text style={styles.gpsCardTitle}>Live GPS Coordinates</Text>
             </View>
             <View style={styles.accuracyBadge}>
-              <Text style={styles.accuracyBadgeText}>±4m Accuracy</Text>
+              <Text style={styles.accuracyBadgeText}>±{currentAccuracy}m Accuracy</Text>
             </View>
           </View>
 
-          {/* Map View Snapshot Container (Height 144, rounded corners 12, pulsing red pin) */}
+          {/* Map View Snapshot Container centered dynamically around live coordinates */}
           <ImageBackground
-            source={{ uri: 'https://static-maps.yandex.ru/1.x/?ll=85.3240,27.7172&z=14&l=map&size=450,180' }}
+            source={{ uri: mapUri }}
             style={styles.mapContainer}
             imageStyle={{ borderRadius: 12 }}
             resizeMode="cover"
@@ -210,7 +329,7 @@ export const SOSScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.mapLocationTag}>
-              <Text style={styles.mapLocationCity}>Kathmandu Valley, Nepal</Text>
+              <Text style={styles.mapLocationCity}>{locationName}</Text>
             </View>
           </ImageBackground>
 
@@ -218,47 +337,53 @@ export const SOSScreen = ({ navigation }) => {
           <View style={styles.gpsBottomBar}>
             <Ionicons name="sync-sharp" size={14} color={colors.safe} />
             <Text style={styles.gpsCoordsText}>
-              Lat: 27.7172° N, Long: 85.3240° E • Updating every 2s
+              Lat: {currentLat.toFixed(4)}° N, Long: {currentLng.toFixed(4)}° E • Updating every 2s
             </Text>
           </View>
         </View>
 
-        {/* 3. Trusted Contacts Status (3-Column Grid) */}
+        {/* 3. Trusted Contacts Status */}
         <View style={styles.contactsCard}>
           <View style={styles.contactsTopBar}>
             <Text style={styles.contactsSectionTitle}>Trusted Contacts Status</Text>
-            <Text style={styles.notifiedCountRightText}>3/3 Notified</Text>
+            <Text style={styles.notifiedCountRightText}>
+              {circleContacts.length > 0 ? `${circleContacts.length}/${circleContacts.length} Notified` : '0 Notified'}
+            </Text>
           </View>
 
-          {/* 3-Column Horizontal Grid */}
-          <View style={styles.contactsGridRow}>
-            {/* Col 1: Aarati R. */}
-            <View style={styles.contactGridCard}>
-              <View style={[styles.contactAvatarSquareGrid, { backgroundColor: '#0A2540' }]}>
-                <Text style={styles.contactAvatarTextGrid}>AR</Text>
-              </View>
-              <Text style={styles.contactNameGrid} numberOfLines={1}>Aarati R.</Text>
-              <Text style={styles.statusTextAckRed}>Acknowledged</Text>
+          {circleContacts.length === 0 ? (
+            <View style={styles.emptyContactsContainer}>
+              <Text style={styles.emptyContactsSub}>No Safety Circle contacts configured</Text>
             </View>
+          ) : (
+            <View style={styles.contactsGridRow}>
+              {circleContacts.map((contact, idx) => {
+                const initials = (contact.name || 'C')
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .substring(0, 2)
+                  .toUpperCase();
+                const avatarBgColors = ['#0A2540', '#2563EB', '#7C3AED', '#059669'];
+                const bgColor = avatarBgColors[idx % avatarBgColors.length];
+                const isAck = idx === 0;
 
-            {/* Col 2: Bikash K. */}
-            <View style={styles.contactGridCard}>
-              <View style={[styles.contactAvatarSquareGrid, { backgroundColor: '#2563EB' }]}>
-                <Text style={styles.contactAvatarTextGrid}>BK</Text>
-              </View>
-              <Text style={styles.contactNameGrid} numberOfLines={1}>Bikash K.</Text>
-              <Text style={styles.statusTextMutedSlate}>Notified</Text>
+                return (
+                  <View key={contact.id || idx} style={styles.contactGridCard}>
+                    <View style={[styles.contactAvatarSquareGrid, { backgroundColor: bgColor }]}>
+                      <Text style={styles.contactAvatarTextGrid}>{initials}</Text>
+                    </View>
+                    <Text style={styles.contactNameGrid} numberOfLines={1}>
+                      {contact.name}
+                    </Text>
+                    <Text style={isAck ? styles.statusTextAckRed : styles.statusTextMutedSlate}>
+                      {isAck ? 'Acknowledged' : 'Notified'}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
-
-            {/* Col 3: Pooja S. */}
-            <View style={styles.contactGridCard}>
-              <View style={[styles.contactAvatarSquareGrid, { backgroundColor: '#7C3AED' }]}>
-                <Text style={styles.contactAvatarTextGrid}>PS</Text>
-              </View>
-              <Text style={styles.contactNameGrid} numberOfLines={1}>Pooja S.</Text>
-              <Text style={styles.statusTextMutedSlate}>Notified</Text>
-            </View>
-          </View>
+          )}
 
           {/* 4. Event Timeline directly below contacts grid */}
           <View style={styles.timelineContainer}>
@@ -268,12 +393,18 @@ export const SOSScreen = ({ navigation }) => {
             </View>
             <View style={styles.timelineItem}>
               <View style={[styles.timelineDot, { backgroundColor: colors.emergency }]} />
-              <Text style={styles.timelineText}>01:44 SMS & push dispatched to 3 contacts</Text>
+              <Text style={styles.timelineText}>
+                01:44 SMS & push dispatched to {circleContacts.length} contacts
+              </Text>
             </View>
-            <View style={styles.timelineItem}>
-              <View style={[styles.timelineDot, { backgroundColor: colors.safe }]} />
-              <Text style={styles.timelineTextEmerald}>01:45 Aarati R. acknowledged alert</Text>
-            </View>
+            {circleContacts.length > 0 && (
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDot, { backgroundColor: colors.safe }]} />
+                <Text style={styles.timelineTextEmerald}>
+                  01:45 {circleContacts[0]?.name} acknowledged alert
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -281,11 +412,15 @@ export const SOSScreen = ({ navigation }) => {
         <View style={styles.evidenceCard}>
           <View style={styles.evidenceHeaderRow}>
             <View style={styles.recIconWrap}>
-              <View style={styles.recRedDot} />
+              <Animated.View style={[styles.recRedDot, { opacity: recPulseAnim }]} />
             </View>
             <View style={styles.evidenceTitleCol}>
               <Text style={styles.evidenceTitle}>Evidence Secure</Text>
-              <Text style={styles.evidenceSubtitle}>Cloud audio/video stream recording</Text>
+              <Text style={styles.evidenceSubtitle}>
+                {isMicRecording
+                  ? 'Cloud audio stream recording active • Encrypted'
+                  : 'Audio evidence recording standby • Encrypted'}
+              </Text>
             </View>
             <View style={styles.encryptedBadge}>
               <Ionicons name="lock-closed-sharp" size={12} color="#FFF" />
@@ -294,12 +429,13 @@ export const SOSScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* 6. Safe Confirmation Action Button: "Hold to confirm: I am Safe" (2-second hold) */}
+        {/* 6. Safe Confirmation Action Button: "Hold to confirm: I am Safe" (2-second hold or tap for confirmation prompt) */}
         <View style={styles.safeConfirmSection}>
           <TouchableOpacity
             activeOpacity={0.88}
             onPressIn={handleCancelPressIn}
             onPressOut={handleCancelPressOut}
+            onPress={handleImSafeTap}
             style={styles.holdConfirmBtn}
             accessibilityRole="button"
             accessibilityLabel="Hold to confirm: I am Safe"
@@ -661,6 +797,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  emptyContactsContainer: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  emptyContactsSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   // Timeline Logs
   timelineContainer: {

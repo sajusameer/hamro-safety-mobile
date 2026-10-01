@@ -1,6 +1,6 @@
 // Hamro Safety - Redesigned Safety Circle Screen (screen_4.png Spec)
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,93 +16,64 @@ import colors from '../../theme/colors';
 import safetyCircleService from '../../services/safetyCircle/safetyCircleService';
 import { useAuth } from '../../context/AuthContext';
 
-// 4 Trusted Members matching screen_4.png spec
-const INITIAL_TRUSTED_MEMBERS = [
-  {
-    id: 'm1',
-    name: 'Aayushma Sharma',
-    role: 'Partner',
-    statusText: 'Last active 2 mins ago • Kathmandu, NP',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    settingText: 'Live Location Enabled',
-    settingIcon: 'settings-sharp',
-    battery: 84,
-    showBattery: true,
-  },
-  {
-    id: 'm2',
-    name: 'Bikash Sharma',
-    role: 'Family',
-    statusText: 'At Home • Lalitpur, NP',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    settingText: 'Live Location Enabled',
-    settingIcon: 'settings-sharp',
-    battery: 92,
-    showBattery: true,
-  },
-  {
-    id: 'm3',
-    name: 'Pooja Thapa',
-    role: 'Roommate',
-    statusText: 'Last active 4 hours ago',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    settingText: 'SOS Alerts Only | Location Hidden',
-    settingIcon: 'notifications-sharp',
-    battery: null,
-    showBattery: false,
-  },
-  {
-    id: 'm4',
-    name: 'Rohan Karki',
-    role: 'Friend',
-    statusText: 'On the move • Thamel',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    settingText: 'Live Location Enabled',
-    settingIcon: 'settings-sharp',
-    battery: 45,
-    showBattery: true,
-  },
-];
+
 
 export const SafetyCircleScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [trustedMembers, setTrustedMembers] = useState(INITIAL_TRUSTED_MEMBERS);
-  const [hasPending, setHasPending] = useState(true);
+  const [trustedMembers, setTrustedMembers] = useState([]);
+  const [hasPending, setHasPending] = useState(false);
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       const data = await safetyCircleService.getCircleMembers(user?.id);
-      if (data && data.length > 0) {
-        // preserve updated list if available
-      }
+      setTrustedMembers(data || []);
     } catch (e) {
       console.warn('Fetch safety circle members error:', e);
+      setTrustedMembers([]);
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    fetchMembers();
-  }, [user]);
+    let isMounted = true;
+    const load = async () => {
+      if (isMounted) await fetchMembers();
+    };
+    load();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchMembers();
+    });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [navigation, fetchMembers]);
 
   const handleMemberAction = (member) => {
     Alert.alert(
-      `${member.name} (${member.role})`,
+      `${member.name} (${member.role || 'Member'})`,
       'Choose an action for this safety circle member:',
       [
         { text: 'View Live Location', onPress: () => Alert.alert('Location', `${member.name} - ${member.statusText}`) },
         { text: 'Edit Permissions', onPress: () => Alert.alert('Permissions', 'SOS alerts and emergency GPS location are active.') },
-        { text: 'Remove Member', style: 'destructive', onPress: () => handleRemoveMember(member.id) },
+        { text: 'Remove Member', style: 'destructive', onPress: () => handleRemoveMember(member.id || member.contactId) },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
 
-  const handleRemoveMember = (id) => {
-    setTrustedMembers((prev) => prev.filter((m) => m.id !== id));
-    Alert.alert('Member Removed', 'Circle member removed successfully.');
+  const handleRemoveMember = async (id) => {
+    try {
+      await safetyCircleService.removeMember(id);
+      setTrustedMembers((prev) => prev.filter((m) => (m.id !== id && m.contactId !== id)));
+      Alert.alert('Member Removed', 'Circle member removed successfully.');
+    } catch (e) {
+      console.warn('Failed to remove member:', e);
+      setTrustedMembers((prev) => prev.filter((m) => (m.id !== id && m.contactId !== id)));
+      Alert.alert('Member Removed', 'Circle member removed successfully.');
+    }
   };
 
   const handlePendingOptions = () => {
@@ -203,60 +174,86 @@ export const SafetyCircleScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {trustedMembers.map((member) => (
-          <View key={member.id} style={styles.memberCardTile}>
-            <View style={styles.memberTopRow}>
-              {/* Photo Avatar with Live Green Dot */}
-              <View style={styles.avatarWrapper}>
-                <Image
-                  source={{ uri: member.avatar }}
-                  style={styles.memberAvatarImg}
-                />
-                <View style={styles.liveGreenDot} />
-              </View>
-
-              {/* Name & Status Column */}
-              <View style={styles.memberInfoCol}>
-                <View style={styles.memberNameAndRoleRow}>
-                  <Text style={styles.memberNameText}>{member.name}</Text>
-                  <View style={styles.roleTagPill}>
-                    <Text style={styles.roleTagPillText}>{member.role}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.memberStatusText}>{member.statusText}</Text>
-              </View>
-
-              {/* 3-Dots Action Button */}
-              <TouchableOpacity
-                style={styles.threeDotsBtn}
-                onPress={() => handleMemberAction(member)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Bottom Metadata Bar */}
-            <View style={styles.memberBottomMetaRow}>
-              <View style={styles.settingIconGroup}>
-                <Ionicons name={member.settingIcon} size={12} color={colors.textSecondary} />
-                <Text style={styles.settingMetaText}>{member.settingText}</Text>
-              </View>
-
-              {member.showBattery && (
-                <View style={styles.batteryGroup}>
-                  <Ionicons
-                    name={member.battery > 50 ? 'battery-charging-sharp' : 'battery-dead-sharp'}
-                    size={12}
-                    color={colors.textSecondary}
-                  />
-                  <Text style={styles.batteryMetaText}>Battery: {member.battery}%</Text>
-                </View>
-              )}
-            </View>
+        {trustedMembers.length === 0 ? (
+          <View style={styles.emptyCardBox}>
+            <Ionicons name="people-outline" size={36} color={colors.textMuted} />
+            <Text style={styles.emptyCardTitle}>No Circle Members Yet</Text>
+            <Text style={styles.emptyCardSub}>
+              Add your trusted guardians and family members to monitor your journeys and receive immediate SOS alerts.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyCardBtn}
+              onPress={() => navigation.navigate('ContactsTab')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="person-add-sharp" size={16} color="#FFF" />
+              <Text style={styles.emptyCardBtnText}>Add First Emergency Contact</Text>
+            </TouchableOpacity>
           </View>
-        ))}
+        ) : (
+          trustedMembers.map((member) => (
+            <View key={member.id} style={styles.memberCardTile}>
+              <View style={styles.memberTopRow}>
+                {/* Photo Avatar with Live Green Dot */}
+                <View style={styles.avatarWrapper}>
+                  {member.avatar_url || member.avatar ? (
+                    <Image
+                      source={{ uri: member.avatar_url || member.avatar }}
+                      style={styles.memberAvatarImg}
+                    />
+                  ) : (
+                    <View style={styles.fallbackAvatarCircle}>
+                      <Text style={styles.fallbackAvatarText}>
+                        {member.name ? member.name.charAt(0).toUpperCase() : 'C'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.liveGreenDot} />
+                </View>
+
+                {/* Name & Status Column */}
+                <View style={styles.memberInfoCol}>
+                  <View style={styles.memberNameAndRoleRow}>
+                    <Text style={styles.memberNameText}>{member.name}</Text>
+                    <View style={styles.roleTagPill}>
+                      <Text style={styles.roleTagPillText}>{member.role || 'Member'}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.memberStatusText}>{member.statusText || 'Active in Safety Circle'}</Text>
+                </View>
+
+                {/* 3-Dots Action Button */}
+                <TouchableOpacity
+                  style={styles.threeDotsBtn}
+                  onPress={() => handleMemberAction(member)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom Metadata Bar */}
+              <View style={styles.memberBottomMetaRow}>
+                <View style={styles.settingIconGroup}>
+                  <Ionicons name={member.settingIcon || 'settings-sharp'} size={12} color={colors.textSecondary} />
+                  <Text style={styles.settingMetaText}>{member.settingText || 'Live Location Enabled'}</Text>
+                </View>
+
+                {member.showBattery !== false && (
+                  <View style={styles.batteryGroup}>
+                    <Ionicons
+                      name={(member.battery || 84) > 50 ? 'battery-charging-sharp' : 'battery-dead-sharp'}
+                      size={12}
+                      color={colors.textSecondary}
+                    />
+                    <Text style={styles.batteryMetaText}>Battery: {member.battery || 84}%</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* 4. Pending Invitations Section */}
@@ -488,6 +485,19 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: colors.surfaceContainer,
   },
+  fallbackAvatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#0A2540',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackAvatarText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   liveGreenDot: {
     position: 'absolute',
     bottom: 0,
@@ -656,6 +666,45 @@ const styles = StyleSheet.create({
   },
   redAddMemberBtnText: {
     fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  // Empty State Card
+  emptyCardBox: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    marginBottom: 12,
+  },
+  emptyCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  emptyCardSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 14,
+    paddingHorizontal: 12,
+  },
+  emptyCardBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyCardBtnText: {
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
   },

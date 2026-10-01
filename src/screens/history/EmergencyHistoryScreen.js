@@ -18,7 +18,7 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchHistory = async () => {
+  const loadHistory = async () => {
     try {
       setError(null);
       const data = await historyService.getHistory(user?.id);
@@ -32,13 +32,31 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    const fetchHistory = async () => {
+      try {
+        setError(null);
+        const data = await historyService.getHistory(user?.id);
+        if (isMounted) setHistory(data);
+      } catch (err) {
+        if (isMounted) setError(err.message || 'Failed to load safety event history.');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    };
     fetchHistory();
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const handleClearHistory = () => {
     Alert.alert(
-      'Clear Safety History?',
-      'This will remove previous event records from your device for privacy.',
+      'Clear Safety History',
+      'Clear all resolved emergency history?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -46,7 +64,7 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             await historyService.clearHistory(user?.id);
-            fetchHistory();
+            await loadHistory();
           },
         },
       ]
@@ -76,7 +94,7 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
         <View style={styles.headerRightGroup}>
           <TouchableOpacity
             style={styles.bellIconBtn}
-            onPress={() => fetchHistory()}
+            onPress={() => loadHistory()}
             accessibilityLabel="Notifications"
           >
             <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
@@ -112,11 +130,11 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
       {loading ? (
         <LoadingState message="Loading safety records..." />
       ) : error ? (
-        <ErrorState message={error} onRetry={fetchHistory} />
+        <ErrorState message={error} onRetry={loadHistory} />
       ) : history.length === 0 ? (
         <EmptyState
           icon="shield-outline"
-          title="No Past Emergency Events"
+          title="No Emergency History"
           description="Your safety history is clear. When you use SOS or safety timers, a private log is maintained here."
         />
       ) : (
@@ -155,7 +173,7 @@ export const EmergencyHistoryScreen = ({ navigation }) => {
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                fetchHistory();
+                loadHistory();
               }}
               tintColor={colors.primary}
             />

@@ -41,6 +41,9 @@ export const SafetyTimerScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await startTimer('Safety Trip', destination.trim() || 'Home', selectedDuration);
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch {
       Alert.alert('Error', 'Failed to start safety timer.');
     } finally {
@@ -149,7 +152,7 @@ export const SafetyTimerScreen = ({ navigation }) => {
           <View style={styles.header}>
             <Text style={styles.title}>Safety Arrival Timer</Text>
             <Text style={styles.subtitle}>
-              Traveling alone or taking a late-night ride? Set an expected arrival time. If you don't check in safely, your Safety Circle is automatically notified.
+              Traveling alone or taking a late-night ride? Set an expected arrival time. If you don&apos;t check in safely, your Safety Circle is automatically notified.
             </Text>
           </View>
 

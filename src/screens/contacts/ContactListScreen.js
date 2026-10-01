@@ -1,6 +1,6 @@
 // Hamro Safety - Emergency Contacts List Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert, FlatList, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
@@ -11,7 +11,7 @@ import EmptyState from '../../components/common/EmptyState';
 import ErrorState from '../../components/common/ErrorState';
 import colors from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
-import contactsService from '../../services/contacts/contactsService';
+import contactService from '../../services/contactService';
 
 export const ContactListScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -20,26 +20,34 @@ export const ContactListScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     try {
       setError(null);
-      const data = await contactsService.getContacts(user?.id);
-      setContacts(data);
+      const data = await contactService.getContacts(user?.id);
+      setContacts(data || []);
     } catch (err) {
+      console.error('Fetch contacts error:', err);
       setError(err.message || 'Failed to load emergency contacts.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      if (isMounted) await fetchContacts();
+    };
+    load();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchContacts();
     });
-    fetchContacts();
-    return unsubscribe;
-  }, [navigation, user]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [navigation, fetchContacts]);
 
   const navigateTo = (screenName, params) => {
     const parent = navigation.getParent();
@@ -61,10 +69,12 @@ export const ContactListScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await contactsService.deleteContact(contact.id);
-              fetchContacts();
-            } catch {
-              Alert.alert('Error', 'Failed to delete contact.');
+              await contactService.deleteContact(contact.id);
+              setContacts((prev) => prev.filter((c) => c.id !== contact.id));
+              Alert.alert('Contact Deleted', `${contact.name} has been removed.`);
+            } catch (err) {
+              console.error('Delete contact error:', err);
+              Alert.alert('Error', 'Failed to delete contact. Please try again.');
             }
           },
         },
@@ -72,11 +82,29 @@ export const ContactListScreen = ({ navigation }) => {
     );
   };
 
+  const handleToggleCircle = async (contact, newStatus) => {
+    // Optimistic UI update
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contact.id ? { ...c, is_in_circle: newStatus } : c))
+    );
+
+    try {
+      await contactService.updateContact(contact.id, { is_in_circle: newStatus });
+    } catch (err) {
+      console.error('Toggle safety circle error:', err);
+      // Revert optimistic update on failure
+      setContacts((prev) =>
+        prev.map((c) => (c.id === contact.id ? { ...c, is_in_circle: !newStatus } : c))
+      );
+      Alert.alert('Error', 'Failed to update Safety Circle setting.');
+    }
+  };
+
   return (
     <ScreenContainer contentContainerStyle={styles.container}>
       {/* Header bar */}
       <View style={styles.topBar}>
-        <View>
+        <View style={styles.titleGroup}>
           <Text style={styles.title}>Emergency Contacts</Text>
           <Text style={styles.subtitle}>
             {contacts.length} Trusted Guardian{contacts.length === 1 ? '' : 's'}
@@ -121,6 +149,7 @@ export const ContactListScreen = ({ navigation }) => {
               contact={item}
               onEdit={() => navigateTo('EditContact', { contact: item })}
               onDelete={() => handleDelete(item)}
+              onToggleCircle={(newStatus) => handleToggleCircle(item, newStatus)}
             />
           )}
           contentContainerStyle={styles.listContent}
@@ -150,6 +179,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  titleGroup: {
+    flex: 1,
   },
   title: {
     fontSize: 20,

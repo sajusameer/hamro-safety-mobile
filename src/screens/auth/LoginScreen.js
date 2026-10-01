@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { APP_CONFIG } from '../../constants/config';
 
 export const LoginScreen = ({ navigation }) => {
-  const { signIn, loginAsDemo, isDemo } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,9 @@ export const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError('Please enter both email and password.');
+      const errMsg = 'Please enter both email and password.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
       return;
     }
     setError(null);
@@ -27,7 +29,10 @@ export const LoginScreen = ({ navigation }) => {
     try {
       await signIn(email.trim(), password);
     } catch (err) {
-      setError(err.message || 'Login failed. Please check credentials.');
+      console.log('Supabase Auth Error:', err);
+      const errMsg = err?.message || 'Login failed. Please check credentials.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
     } finally {
       setLoading(false);
     }
@@ -45,16 +50,6 @@ export const LoginScreen = ({ navigation }) => {
         <Text style={styles.tagline}>{APP_CONFIG.tagline}</Text>
         <Text style={styles.companyName}>{APP_CONFIG.company}</Text>
       </View>
-
-      {/* Demo Notice Banner if Supabase not configured */}
-      {isDemo && (
-        <View style={styles.demoBanner}>
-          <Ionicons name="information-circle" size={18} color={colors.warningDark} />
-          <Text style={styles.demoBannerText}>
-            Running in local demo mode. Tap "Quick Demo Login" for immediate access.
-          </Text>
-        </View>
-      )}
 
       {/* Form Card */}
       <View style={styles.formCard}>
@@ -101,19 +96,9 @@ export const LoginScreen = ({ navigation }) => {
           style={styles.submitBtn}
         />
 
-        {/* Quick Demo Login Option */}
-        <Button
-          title="Quick Demo Login (One-Tap)"
-          onPress={loginAsDemo}
-          variant="outline"
-          size="md"
-          icon="flash-outline"
-          style={styles.demoBtn}
-        />
-
         {/* Register Link */}
         <View style={styles.footerRow}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
+          <Text style={styles.footerText}>Don&apos;t have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
             <Text style={styles.registerLink}>Register</Text>
           </TouchableOpacity>
@@ -154,21 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginTop: 4,
-  },
-  demoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.warningLight,
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-    gap: 8,
-  },
-  demoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.warningDark,
-    fontWeight: '600',
   },
   formCard: {
     backgroundColor: colors.surface,
@@ -213,11 +183,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitBtn: {
-    marginBottom: 12,
-  },
-  demoBtn: {
     marginBottom: 16,
-    borderColor: colors.secondary,
   },
   footerRow: {
     flexDirection: 'row',

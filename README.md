@@ -29,7 +29,7 @@ A React Native mobile application built with Expo and Supabase for personal prot
 * **Language**: JavaScript (ES6+ / React 19)
 * **Backend**: Supabase (Auth, PostgreSQL, Realtime, Storage)
 * **Navigation**: React Navigation 7 (Native Stack & Bottom Tabs)
-* **Location**: Expo Location
+* **Location & Audio**: Expo Location, Expo AV (`expo-av`), Expo FileSystem (`expo-file-system`)
 * **Storage**: Expo SecureStore for encrypted auth session persistence
 * **Icons**: `@expo/vector-icons` (Ionicons)
 
@@ -145,6 +145,10 @@ hamro-safety/
 2. Install dependencies:
    ```bash
    npm install
+   ```
+3. Install audio, file system, and auth browser modules:
+   ```bash
+   npx expo install expo-av expo-file-system expo-web-browser expo-auth-session expo-linking
    ```
 
 ### Environment Configuration

@@ -26,7 +26,9 @@ export const EditProfileScreen = ({ route, navigation }) => {
     try {
       await profileService.updateProfile(user?.id, {
         full_name: fullName.trim(),
+        name: fullName.trim(),
         phone_number: phoneNumber.trim(),
+        emergency_phone: phoneNumber.trim(),
         blood_group: bloodGroup,
         medical_notes: medicalNotes.trim(),
       });

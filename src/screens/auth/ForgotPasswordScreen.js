@@ -45,7 +45,7 @@ export const ForgotPasswordScreen = ({ navigation }) => {
 
         <Text style={styles.title}>Reset Password</Text>
         <Text style={styles.subtitle}>
-          Enter your registered email and we'll send instructions to reset your password.
+          Enter your registered email and we&apos;ll send instructions to reset your password.
         </Text>
 
         {submitted ? (

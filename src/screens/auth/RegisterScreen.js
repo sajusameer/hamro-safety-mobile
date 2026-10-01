@@ -21,29 +21,45 @@ export const RegisterScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setError('Please fill in all required fields.');
+      const errMsg = 'Please fill in all required fields.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      const errMsg = 'Passwords do not match.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      const errMsg = 'Password must be at least 6 characters.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
       return;
     }
 
     setError(null);
     setLoading(true);
     try {
-      await signUp(email.trim(), password, fullName.trim(), phone.trim());
-      Alert.alert(
-        'Account Created',
-        'Your Hamro Safety profile has been registered successfully.',
-        [{ text: 'Continue', onPress: () => {} }]
-      );
+      const res = await signUp(email.trim(), password, fullName.trim(), phone.trim());
+      if (res?.session) {
+        Alert.alert(
+          'Account Created',
+          'Registration successful! You are now logged in.'
+        );
+      } else {
+        Alert.alert(
+          'Account Created',
+          'Your Hamro Safety profile has been registered successfully. If required, please verify your email before signing in.',
+          [{ text: 'Continue', onPress: () => navigation.navigate('Login') }]
+        );
+      }
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      console.log('Supabase Auth Error:', err);
+      const errMsg = err?.message || 'Registration failed. Please try again.';
+      setError(errMsg);
+      Alert.alert('Auth Error', errMsg);
     } finally {
       setLoading(false);
     }
@@ -213,3 +229,4 @@ const styles = StyleSheet.create({
 });
 
 export default RegisterScreen;
+

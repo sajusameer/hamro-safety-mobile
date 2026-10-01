@@ -1,6 +1,6 @@
 // Hamro Safety - Profile Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
@@ -14,22 +14,29 @@ export const ProfileScreen = ({ navigation }) => {
   const { user, signOut, isDemo } = useAuth();
   const [profile, setProfile] = useState(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const data = await profileService.getProfile(user?.id);
       setProfile(data);
     } catch (e) {
       console.warn('Fetch profile error:', e);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      if (isMounted) await fetchProfile();
+    };
+    load();
     const unsubscribe = navigation.addListener('focus', () => {
       fetchProfile();
     });
-    fetchProfile();
-    return unsubscribe;
-  }, [navigation, user]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [navigation, fetchProfile]);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out of Hamro Safety?', [
@@ -44,11 +51,24 @@ export const ProfileScreen = ({ navigation }) => {
     ]);
   };
 
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || 'Safety User';
-  const displayEmail = profile?.email || user?.email || 'user@example.com';
-  const displayPhone = profile?.phone_number || user?.user_metadata?.phone_number || 'Not set';
+  const displayName = profile?.full_name || profile?.name || user?.user_metadata?.full_name || 'Safety User';
+  const displayEmail = user?.email || profile?.email || 'user@example.com';
+  const displayPhone = profile?.emergency_phone || profile?.phone_number || user?.user_metadata?.phone_number || 'Not set';
 
   const navigateTo = (screenName, params) => {
+    if (screenName === 'HistoryTab' || screenName === 'EmergencyHistory') {
+      navigation.navigate('HistoryTab', params);
+      return;
+    }
+    if (screenName === 'SafetyPrivacy') {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('SafetyPrivacy', params);
+      } else {
+        navigation.navigate('SafetyPrivacy', params);
+      }
+      return;
+    }
     const parent = navigation.getParent();
     if (parent) {
       parent.navigate(screenName, params);

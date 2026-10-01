@@ -1,8 +1,8 @@
 // Hamro Safety - Global Emergency State Context
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { SAFETY_STATES } from '../constants/safetyStates';
-import sosService from '../services/sos/sosService';
+import sosService from '../services/sosService';
 import locationService from '../services/location/locationService';
 
 const EmergencyContext = createContext({
@@ -22,43 +22,48 @@ export const EmergencyProvider = ({ children }) => {
   const [safetyState, setSafetyState] = useState(SAFETY_STATES.SAFE);
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [lastLocation, setLastLocation] = useState(null);
-  const [dispatches, setDispatches] = useState([]);
+  const [dispatches] = useState([]);
   const [isActivating, setIsActivating] = useState(false);
 
-  // Check for any active ongoing emergency on app startup
+  // Check for active SOS event on component mount
   useEffect(() => {
+    let isMounted = true;
     const checkActive = async () => {
       try {
-        const existing = await sosService.getActiveEmergency();
-        if (existing) {
+        const existing = await sosService.getActiveSOSEvent();
+        if (isMounted && existing) {
           setActiveEmergency(existing);
           setSafetyState(SAFETY_STATES.SOS_ACTIVE);
-          locationService.startEmergencyTracking((loc) => setLastLocation(loc));
-        } else {
-          // Pre-fetch single location snapshot for dashboard
+          locationService.startEmergencyTracking((loc) => {
+            if (isMounted) setLastLocation(loc);
+          });
+        } else if (isMounted) {
           const loc = await locationService.getCurrentLocation();
-          setLastLocation(loc);
+          if (isMounted) setLastLocation(loc);
         }
       } catch (e) {
-        console.warn('Check active emergency failed:', e);
+        console.warn('Check active SOS event failed:', e);
       }
     };
     checkActive();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const refreshLocation = async () => {
+  const refreshLocation = useCallback(async () => {
     const loc = await locationService.getCurrentLocation();
     setLastLocation(loc);
     return loc;
-  };
+  }, []);
 
-  // Called when user begins holding SOS button
+  // Called when user starts holding SOS button
   const startActivating = () => {
     setIsActivating(true);
     setSafetyState(SAFETY_STATES.SOS_ACTIVATING);
   };
 
-  // Called if user releases SOS button before 3-second hold finishes
+  // Called if user releases before 3-second hold finishes
   const cancelActivating = () => {
     setIsActivating(false);
     if (safetyState === SAFETY_STATES.SOS_ACTIVATING) {
@@ -66,23 +71,27 @@ export const EmergencyProvider = ({ children }) => {
     }
   };
 
-  // Called after full 3-second hold finishes
+  // Trigger SOS event after 3-second hold
   const triggerSOS = async () => {
     setIsActivating(false);
-    setSafetyState(SAFETY_STATES.SOS_ACTIVE);
-
     try {
-      const result = await sosService.triggerSOS();
-      setActiveEmergency(result.event);
-      setLastLocation(result.location);
-      setDispatches(result.dispatches);
+      const loc = await locationService.getCurrentLocation();
+      setLastLocation(loc);
 
-      // Start continuous location stream during active emergency
-      locationService.startEmergencyTracking((loc) => {
-        setLastLocation(loc);
+      const event = await sosService.triggerSOS({
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        batteryLevel: loc.batteryPercentage || null,
       });
 
-      return result;
+      setActiveEmergency(event);
+      setSafetyState(SAFETY_STATES.SOS_ACTIVE);
+
+      locationService.startEmergencyTracking((newLoc) => {
+        setLastLocation(newLoc);
+      });
+
+      return event;
     } catch (error) {
       console.error('Trigger SOS failed:', error);
       setSafetyState(SAFETY_STATES.FAILED);
@@ -90,19 +99,23 @@ export const EmergencyProvider = ({ children }) => {
     }
   };
 
-  // Resolve emergency safely
-  const resolveEmergency = async (resolutionNote = 'Resolved safely by user') => {
-    if (activeEmergency?.id) {
-      await sosService.resolveSOS(activeEmergency.id, resolutionNote);
+  // Resolve emergency safely ("I'm Safe" confirmed)
+  const resolveEmergency = async (eventId) => {
+    const targetId = eventId || activeEmergency?.id;
+    if (targetId) {
+      try {
+        await sosService.resolveSOS(targetId);
+      } catch (e) {
+        console.warn('Resolve SOS error in context:', e);
+      }
     }
     locationService.stopEmergencyTracking();
     setActiveEmergency(null);
     setSafetyState(SAFETY_STATES.RESOLVED);
 
-    // Return to calm SAFE state after 4 seconds
     setTimeout(() => {
       setSafetyState(SAFETY_STATES.SAFE);
-    }, 4000);
+    }, 3000);
   };
 
   return (

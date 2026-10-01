@@ -23,6 +23,7 @@ import SafetyToolsScreen from '../screens/tools/SafetyToolsScreen';
 import FakeCallScreen from '../screens/tools/FakeCallScreen';
 import QuickExitScreen from '../screens/tools/QuickExitScreen';
 import EmergencyQRScreen from '../screens/tools/EmergencyQRScreen';
+import JourneyScreen from '../screens/journey/JourneyScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -167,6 +168,7 @@ export const AppNavigator = () => {
       <Stack.Screen name="FakeCall" component={FakeCallScreen} />
       <Stack.Screen name="QuickExit" component={QuickExitScreen} />
       <Stack.Screen name="EmergencyQR" component={EmergencyQRScreen} />
+      <Stack.Screen name="Journey" component={JourneyScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="ProfileTab" component={ProfileScreen} />
       <Stack.Screen name="DashboardTab" component={DashboardScreen} />

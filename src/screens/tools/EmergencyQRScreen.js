@@ -1,7 +1,5 @@
-// Hamro Safety - Emergency ICE Medical QR Screen
-// Company: Zuptrix Solutions Pvt. Ltd.
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import colors from '../../theme/colors';
@@ -13,25 +11,51 @@ export const EmergencyQRScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [primaryContact, setPrimaryContact] = useState(null);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     const loadData = async () => {
       try {
         const prof = await profileService.getProfile(user?.id);
+        if (!isMounted) return;
         setProfile(prof);
+
         const contacts = await contactsService.getContacts(user?.id);
-        const primary = contacts.find((c) => c.priority === 1) || contacts[0];
-        setPrimaryContact(primary);
+        if (!isMounted) return;
+
+        if (Array.isArray(contacts) && contacts.length > 0) {
+          const sorted = [...contacts].sort((a, b) => (a.priority || 99) - (b.priority || 99));
+          setPrimaryContact(sorted[0]);
+        } else {
+          setPrimaryContact(null);
+        }
       } catch (e) {
         console.warn('Load QR data error:', e);
       }
     };
     loadData();
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
-  const fullName = profile?.full_name || 'Emergency Holder';
+  const fullName = profile?.full_name || profile?.name || user?.user_metadata?.full_name || 'Hamro Safety User';
   const bloodGroup = profile?.blood_group || 'O+';
-  const medicalNotes = profile?.medical_notes || 'No known allergies.';
+  const medicalNotes = profile?.medical_notes || 'No known medical allergies.';
+  const primaryContactSummary = primaryContact
+    ? `${primaryContact.name} (${primaryContact.phone})`
+    : 'Not configured';
+
+  const iceSummary = {
+    patient_name: fullName,
+    blood_group: bloodGroup,
+    primary_emergency_contact: primaryContactSummary,
+    medical_notes: medicalNotes,
+  };
+
+  const qrJsonString = JSON.stringify(iceSummary);
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrJsonString)}`;
 
   return (
     <ScreenContainer scrollable contentContainerStyle={styles.container}>
@@ -53,15 +77,23 @@ export const EmergencyQRScreen = ({ navigation }) => {
           <Text style={styles.iceHeaderTitle}>IN CASE OF EMERGENCY (ICE)</Text>
         </View>
 
-        {/* Simulated QR Code Graphic */}
+        {/* Dynamic QR Code Graphic */}
         <View style={styles.qrContainer}>
           <View style={styles.qrBox}>
-            <Ionicons name="qr-code" size={160} color={colors.textPrimary} />
+            {!imageError ? (
+              <Image
+                source={{ uri: qrImageUrl }}
+                style={{ width: 160, height: 160 }}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <Ionicons name="qr-code" size={160} color={colors.textPrimary} />
+            )}
           </View>
           <Text style={styles.scanNotice}>Scan for Triage Profile</Text>
         </View>
 
-        {/* Limited Public ICE Triage Data */}
+        {/* Dynamic Public ICE Triage Data */}
         <View style={styles.dataBlock}>
           <View style={styles.row}>
             <Text style={styles.label}>Patient Name:</Text>
@@ -75,9 +107,7 @@ export const EmergencyQRScreen = ({ navigation }) => {
 
           <View style={styles.row}>
             <Text style={styles.label}>Primary Emergency Contact:</Text>
-            <Text style={styles.val}>
-              {primaryContact ? `${primaryContact.name} (${primaryContact.phone})` : 'Not configured'}
-            </Text>
+            <Text style={styles.val}>{primaryContactSummary}</Text>
           </View>
 
           <View style={styles.row}>

@@ -40,7 +40,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Hamro Safety to use your location during active emergencies."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

@@ -1,7 +1,7 @@
-// Hamro Safety - Redesigned Dashboard / Home Screen (screen_3.png Spec)
+// Hamro Safety - Redesigned Dashboard / Home Screen
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView, Image } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import SOSButton from '../../components/safety/SOSButton';
@@ -9,40 +9,54 @@ import TimerCard from '../../components/safety/TimerCard';
 import colors from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
 import { useEmergency } from '../../context/EmergencyContext';
-
-// 3 Safety Circle Members with real avatars for screen_3.png spec
-const SAFETY_CIRCLE_MEMBERS = [
-  {
-    id: 'm1',
-    name: 'Sarah M.',
-    sub: 'Home • 10m ago',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    initials: 'SM',
-  },
-  {
-    id: 'm2',
-    name: 'Alex K.',
-    sub: 'Work • Just now',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    initials: 'AK',
-  },
-  {
-    id: 'm3',
-    name: 'Mom',
-    sub: 'Active 2m',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    initials: 'M',
-  },
-];
+import { SAFETY_STATES } from '../../constants/safetyStates';
+import safetyCircleService from '../../services/safetyCircle/safetyCircleService';
+import contactService from '../../services/contactService';
+import historyService from '../../services/history/historyService';
 
 export const DashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const { refreshLocation } = useEmergency();
+  const { safetyState, activeEmergency, refreshLocation } = useEmergency();
   const [refreshing, setRefreshing] = useState(false);
+  const [circleMembers, setCircleMembers] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+
+  const isEmergency = safetyState === SAFETY_STATES.SOS_ACTIVE || Boolean(activeEmergency);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      await refreshLocation();
+      let members = await safetyCircleService.getCircleMembers(user?.id);
+      if (!members || members.length === 0) {
+        const contacts = await contactService.getContacts(user?.id);
+        members = (contacts || []).filter((c) => c.is_in_circle !== false);
+      }
+      setCircleMembers(members || []);
+      const historyData = await historyService.getHistory(user?.id);
+      setRecentActivities(historyData || []);
+    } catch (e) {
+      console.warn('Dashboard data fetch warning:', e);
+    }
+  }, [refreshLocation, user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      if (isMounted) await loadDashboardData();
+    };
+    load();
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadDashboardData();
+    });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [navigation, loadDashboardData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshLocation();
+    await loadDashboardData();
     setRefreshing(false);
   };
 
@@ -69,6 +83,16 @@ export const DashboardScreen = ({ navigation }) => {
       parent.navigate(screenName, params);
     } else {
       navigation.navigate(screenName, params);
+    }
+  };
+
+  const formatActivityTime = (isoString) => {
+    if (!isoString) return 'Just now';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return 'Just now';
     }
   };
 
@@ -101,23 +125,42 @@ export const DashboardScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* 2. Current Status Banner (Dark Navy Card #0A2540) */}
-      <View style={styles.darkStatusBanner}>
+      {/* 2. Current Status Banner */}
+      <TouchableOpacity
+        style={[styles.darkStatusBanner, isEmergency && { backgroundColor: colors.emergency }]}
+        onPress={() => isEmergency && navigateTo('SOSTab')}
+        activeOpacity={0.88}
+      >
         <View style={styles.shieldIconSquare}>
-          <Ionicons name="shield-outline" size={20} color={colors.emergency} />
+          <Ionicons
+            name={isEmergency ? 'warning-sharp' : 'shield-outline'}
+            size={20}
+            color={isEmergency ? '#FFFFFF' : colors.emergency}
+          />
         </View>
 
         <View style={styles.statusBannerCenterCol}>
-          <Text style={styles.statusBannerLabel}>CURRENT STATUS</Text>
-          <Text style={styles.statusBannerMainText}>Protected & Monitored</Text>
+          <Text style={styles.statusBannerLabel}>
+            {isEmergency ? '🔴 SOS ACTIVE' : 'CURRENT STATUS'}
+          </Text>
+          <Text style={styles.statusBannerMainText}>
+            {isEmergency ? 'Emergency Alert Triggered' : 'Protected & Monitored'}
+          </Text>
         </View>
 
-        <View style={styles.securePillDark}>
-          <View style={styles.secureDotGreen} />
-          <Ionicons name="shield-checkmark" size={13} color={colors.safe} style={{ marginRight: 3 }} />
-          <Text style={styles.securePillText}>Secure</Text>
+        <View style={[styles.securePillDark, isEmergency && { backgroundColor: 'rgba(0,0,0,0.25)' }]}>
+          <View style={[styles.secureDotGreen, isEmergency && { backgroundColor: '#FFD700' }]} />
+          <Ionicons
+            name={isEmergency ? 'warning' : 'shield-checkmark'}
+            size={13}
+            color={isEmergency ? '#FFD700' : colors.safe}
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.securePillText}>
+            {isEmergency ? 'ACTIVE SOS' : '🟢 YOU ARE SAFE'}
+          </Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* 3. Emergency Assistance Card */}
       <View style={styles.emergencyCardBox}>
@@ -139,37 +182,60 @@ export const DashboardScreen = ({ navigation }) => {
         onManagePress={() => navigateTo('SafetyTimer')}
       />
 
-      {/* 5. Safety Circle Section (3 Active, Avatar Images) */}
+      {/* 5. Dynamic Safety Circle Section */}
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitleText}>Safety Circle</Text>
-          <Text style={styles.activeLabelRight}>3 Active</Text>
+          <Text style={styles.activeLabelRight}>{circleMembers.length} Active</Text>
         </View>
 
-        <View style={styles.circleGridRow}>
-          {SAFETY_CIRCLE_MEMBERS.map((member) => (
-            <TouchableOpacity
-              key={member.id}
-              style={styles.memberCardTile}
-              onPress={() => navigateTo('CircleTab')}
-              activeOpacity={0.85}
-            >
-              <View style={styles.avatarWrapper}>
-                <Image
-                  source={{ uri: member.avatar }}
-                  style={styles.avatarImg}
-                />
-                <View style={styles.liveGreenDot} />
-              </View>
-              <Text style={styles.memberName} numberOfLines={1}>
-                {member.name}
-              </Text>
-              <Text style={styles.memberSubText} numberOfLines={1}>
-                {member.sub}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {circleMembers.length === 0 ? (
+          <TouchableOpacity
+            style={styles.emptyCircleCard}
+            onPress={() => navigateTo('CircleTab')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="person-add-outline" size={20} color={colors.emergency} />
+            <View style={styles.emptyCircleCol}>
+              <Text style={styles.emptyCircleTitle}>No emergency contacts added</Text>
+              <Text style={styles.emptyCircleSub}>Tap to add your trusted guardians to your Safety Circle</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.circleGridRow}>
+            {circleMembers.slice(0, 3).map((member) => (
+              <TouchableOpacity
+                key={member.id}
+                style={styles.memberCardTile}
+                onPress={() => navigateTo('CircleTab')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.avatarWrapper}>
+                  {member.avatar_url || member.avatar ? (
+                    <Image
+                      source={{ uri: member.avatar_url || member.avatar }}
+                      style={styles.avatarImg}
+                    />
+                  ) : (
+                    <View style={styles.fallbackAvatarCircle}>
+                      <Text style={styles.fallbackAvatarText}>
+                        {(member.name || 'C').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.liveGreenDot} />
+                </View>
+                <Text style={styles.memberName} numberOfLines={1}>
+                  {member.name}
+                </Text>
+                <Text style={styles.memberSubText} numberOfLines={1}>
+                  {member.role || 'Guardian'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* 6. Quick Safety Actions Grid (2x2) */}
@@ -208,7 +274,7 @@ export const DashboardScreen = ({ navigation }) => {
           {/* Tile 3: Journey (Live tracking) */}
           <TouchableOpacity
             style={styles.gridTile}
-            onPress={() => navigateTo('SafetyTimer')}
+            onPress={() => navigateTo('Journey')}
             activeOpacity={0.85}
           >
             <View style={[styles.tileIconWrap, { backgroundColor: '#F0FDF4' }]}>
@@ -239,37 +305,39 @@ export const DashboardScreen = ({ navigation }) => {
           <Text style={styles.sectionTitleText}>Recent Activity</Text>
         </View>
 
-        {/* Event 1 */}
-        <TouchableOpacity
-          style={styles.activityCardItem}
-          onPress={() => navigateTo('HistoryTab')}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.activityIconWrap, { backgroundColor: colors.safeLight }]}>
-            <Ionicons name="checkmark-circle-sharp" size={18} color={colors.safe} />
+        {recentActivities.length === 0 ? (
+          <View style={styles.emptyActivityCard}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.safe} />
+            <Text style={styles.emptyActivityText}>No recent emergency events recorded.</Text>
           </View>
-          <View style={styles.activityTextContainer}>
-            <Text style={styles.activityTitle}>Safe check-in completed</Text>
-            <Text style={styles.activitySubtitle}>Arrived at Office</Text>
-            <Text style={styles.activityTime}>09:30 AM</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Event 2 */}
-        <TouchableOpacity
-          style={styles.activityCardItem}
-          onPress={() => navigateTo('HistoryTab')}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.activityIconWrap, { backgroundColor: '#EFF6FF' }]}>
-            <Ionicons name="eye-sharp" size={18} color="#2563EB" />
-          </View>
-          <View style={styles.activityTextContainer}>
-            <Text style={styles.activityTitle}>Sarah M. viewed location</Text>
-            <Text style={styles.activitySubtitle}>Live sharing active</Text>
-            <Text style={styles.activityTime}>08:15 AM</Text>
-          </View>
-        </TouchableOpacity>
+        ) : (
+          recentActivities.slice(0, 3).map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.activityCardItem}
+              onPress={() => navigateTo('HistoryTab')}
+              activeOpacity={0.85}
+            >
+              <View style={[
+                styles.activityIconWrap,
+                { backgroundColor: item.status === 'resolved' ? colors.safeLight : colors.emergencyLight }
+              ]}>
+                <Ionicons
+                  name={item.status === 'resolved' ? 'checkmark-circle-sharp' : 'alert-circle-sharp'}
+                  size={18}
+                  color={item.status === 'resolved' ? colors.safe : colors.emergency}
+                />
+              </View>
+              <View style={styles.activityTextContainer}>
+                <Text style={styles.activityTitle}>
+                  {item.event_type === 'sos' ? 'SOS Emergency Alert' : 'Safety Check-in'} ({item.status})
+                </Text>
+                <Text style={styles.activitySubtitle}>{item.location_name || 'Device GPS'}</Text>
+                <Text style={styles.activityTime}>{formatActivityTime(item.triggered_at)}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     </ScreenContainer>
   );
@@ -419,6 +487,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textSecondary,
   },
+  // Empty Circle Prompt
+  emptyCircleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    gap: 10,
+  },
+  emptyCircleCol: {
+    flex: 1,
+  },
+  emptyCircleTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  emptyCircleSub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   // Safety Circle Row
   circleGridRow: {
     flexDirection: 'row',
@@ -442,6 +534,19 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: colors.surfaceContainer,
+  },
+  fallbackAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0A2540',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackAvatarText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   liveGreenDot: {
     position: 'absolute',
@@ -499,6 +604,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   // Recent Activity Feed
+  emptyActivityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    gap: 8,
+  },
+  emptyActivityText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
   activityCardItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -538,5 +658,3 @@ const styles = StyleSheet.create({
 });
 
 export default DashboardScreen;
-
-

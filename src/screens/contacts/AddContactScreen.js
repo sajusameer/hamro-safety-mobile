@@ -1,12 +1,12 @@
 // Hamro Safety - Add Emergency Contact Screen
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import colors from '../../theme/colors';
-import contactsService from '../../services/contacts/contactsService';
+import contactService from '../../services/contactService';
 import { useAuth } from '../../context/AuthContext';
 
 export const AddContactScreen = ({ navigation }) => {
@@ -16,6 +16,7 @@ export const AddContactScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [relationship, setRelationship] = useState('Family');
   const [priority, setPriority] = useState(1);
+  const [isInCircle, setIsInCircle] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -30,13 +31,14 @@ export const AddContactScreen = ({ navigation }) => {
     setError(null);
     setLoading(true);
     try {
-      await contactsService.addContact(
+      await contactService.addContact(
         {
           name: name.trim(),
           phone: phone.trim(),
           email: email.trim() || null,
           relationship,
           priority,
+          is_in_circle: isInCircle,
         },
         user?.id
       );
@@ -144,6 +146,22 @@ export const AddContactScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Safety Circle Inclusion Switch */}
+        <View style={styles.switchRow}>
+          <View style={styles.switchTextCol}>
+            <Text style={styles.switchTitle}>Include in Safety Circle</Text>
+            <Text style={styles.switchSub}>
+              Allows this contact to see live status updates and receive circle alerts.
+            </Text>
+          </View>
+          <Switch
+            value={isInCircle}
+            onValueChange={setIsInCircle}
+            trackColor={{ false: colors.surfaceBorder, true: '#BFDBFE' }}
+            thumbColor={isInCircle ? colors.primary : '#94A3B8'}
+          />
+        </View>
+
         <Button
           title="Save Emergency Contact"
           onPress={handleSave}
@@ -240,7 +258,7 @@ const styles = StyleSheet.create({
   priorityRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   priorityBtn: {
     flex: 1,
@@ -268,8 +286,32 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '700',
   },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.divider,
+    marginBottom: 20,
+  },
+  switchTextCol: {
+    flex: 1,
+    marginRight: 10,
+  },
+  switchTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  switchSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   saveBtn: {
-    marginTop: 8,
+    marginTop: 4,
   },
 });
 

@@ -1,6 +1,6 @@
 // Hamro Safety - Contact Card Component
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../theme/colors';
 
@@ -8,10 +8,12 @@ export const ContactCard = ({
   contact,
   onEdit,
   onDelete,
+  onToggleCircle,
   showCircleBadges = true,
   style,
 }) => {
   const isPrimary = contact.priority === 1;
+  const isInCircle = contact.is_in_circle !== false;
 
   const handleCall = () => {
     if (contact.phone) {
@@ -51,6 +53,24 @@ export const ContactCard = ({
         >
           <Ionicons name="call" size={18} color={colors.primary} />
         </TouchableOpacity>
+      </View>
+
+      {/* Safety Circle Inclusion Toggle */}
+      <View style={styles.circleToggleRow}>
+        <View style={styles.circleToggleLeft}>
+          <Ionicons
+            name={isInCircle ? 'people' : 'people-outline'}
+            size={16}
+            color={isInCircle ? colors.primary : colors.textMuted}
+          />
+          <Text style={styles.circleToggleLabel}>Safety Circle Guardian</Text>
+        </View>
+        <Switch
+          value={isInCircle}
+          onValueChange={(val) => onToggleCircle && onToggleCircle(val)}
+          trackColor={{ false: colors.surfaceBorder, true: '#BFDBFE' }}
+          thumbColor={isInCircle ? colors.primary : '#94A3B8'}
+        />
       </View>
 
       {/* Permissions / Circle badges */}
@@ -170,12 +190,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
   },
+  circleToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  circleToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  circleToggleLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
   circleRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },

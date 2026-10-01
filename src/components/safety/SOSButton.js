@@ -1,6 +1,6 @@
 // Hamro Safety - Hold-to-Activate SOS Button (Redesigned)
 // Company: Zuptrix Solutions Pvt. Ltd.
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   Vibration,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import colors from '../../theme/colors';
 import { useEmergency } from '../../context/EmergencyContext';
 import { SAFETY_STATES } from '../../constants/safetyStates';
@@ -21,9 +20,16 @@ export const SOSButton = ({ onActivated, style }) => {
   const { safetyState, startActivating, cancelActivating, triggerSOS } = useEmergency();
   const [progress, setProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
+  const [scaleAnim] = useState(() => new Animated.Value(1));
   const holdTimerRef = useRef(null);
   const intervalRef = useRef(null);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
 
   const handlePressIn = () => {
     if (safetyState === SAFETY_STATES.SOS_ACTIVE) return;
@@ -37,11 +43,8 @@ export const SOSButton = ({ onActivated, style }) => {
       useNativeDriver: true,
     }).start();
 
-    const startTime = Date.now();
     intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const currentPct = Math.min(100, Math.floor((elapsed / HOLD_DURATION_MS) * 100));
-      setProgress(currentPct);
+      setProgress((prev) => Math.min(100, Math.floor(prev + (50 / HOLD_DURATION_MS) * 100)));
     }, 50);
 
     holdTimerRef.current = setTimeout(async () => {
@@ -51,9 +54,7 @@ export const SOSButton = ({ onActivated, style }) => {
 
       try {
         Vibration.vibrate(Platform.OS === 'android' ? [0, 250, 100, 250] : 400);
-      } catch (e) {
-        console.warn('Vibration failed:', e);
-      }
+      } catch (_e) {}
 
       try {
         await triggerSOS();

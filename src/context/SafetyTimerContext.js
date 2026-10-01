@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import safetyTimerService from '../services/safetyTimer/safetyTimerService';
 import { useEmergency } from './EmergencyContext';
+import { useAuth } from './AuthContext';
 import { SAFETY_STATES } from '../constants/safetyStates';
 
 const SafetyTimerContext = createContext({
@@ -21,16 +22,24 @@ export const SafetyTimerProvider = ({ children }) => {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
   const { setSafetyState, triggerSOS } = useEmergency();
+  const { user } = useAuth();
 
-  // Countdown timer loop
+  // Load existing active timer on startup
   useEffect(() => {
-    if (!activeTimer) {
-      setRemainingSeconds(0);
-      setIsExpired(false);
-      return;
-    }
+    const checkActive = async () => {
+      const timer = await safetyTimerService.getActiveTimer(user?.id);
+      if (timer) {
+        setActiveTimer(timer);
+      }
+    };
+    checkActive();
+  }, [user]);
 
-    const interval = setInterval(() => {
+  // Countdown timer loop & automatic escalation upon expiry
+  useEffect(() => {
+    if (!activeTimer) return;
+
+    const interval = setInterval(async () => {
       const now = new Date().getTime();
       const expiresAt = new Date(activeTimer.expires_at).getTime();
       const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
@@ -41,14 +50,21 @@ export const SafetyTimerProvider = ({ children }) => {
         setIsExpired(true);
         setSafetyState(SAFETY_STATES.EXPIRED);
         clearInterval(interval);
+        // Automatic escalation to active emergency event upon unconfirmed expiry
+        try {
+          await safetyTimerService.escalateTimerToHelp(activeTimer.id);
+          await triggerSOS();
+        } catch (e) {
+          console.warn('Auto escalation failed:', e);
+        }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeTimer, isExpired]);
+  }, [activeTimer, isExpired, setSafetyState, triggerSOS]);
 
   const startTimer = async (title, destination, durationMinutes) => {
-    const timer = await safetyTimerService.startTimer(title, destination, durationMinutes);
+    const timer = await safetyTimerService.startTimer(title, destination, durationMinutes, user?.id);
     setActiveTimer(timer);
     setIsExpired(false);
     return timer;
@@ -107,7 +123,6 @@ export const SafetyTimerProvider = ({ children }) => {
     </SafetyTimerContext.Provider>
   );
 };
-
 
 export const useSafetyTimer = () => useContext(SafetyTimerContext);
 export default SafetyTimerContext;
